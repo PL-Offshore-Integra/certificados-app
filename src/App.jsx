@@ -224,13 +224,8 @@ tr.drag-over td{border-top:2px solid var(--blue)!important}
 .sv-add-btn:hover{background:#99F6E4}
 @media print{
   .no-print{display:none!important}
-  body{background:#fff;margin:0;padding:0}
+  body{background:#fff}
   @page{size:A4;margin:14mm 12mm}
-  .print-overlay{position:static!important;background:none!important;display:block!important;padding:0!important;overflow:visible!important}
-  .print-modal{box-shadow:none!important;border-radius:0!important;max-width:100%!important;width:100%!important}
-  .print-modal-bar{display:none!important}
-  .print-body{padding:0!important}
-  .app,.sidebar,.topbar,.content{display:none!important}
 }
 .print-overlay{position:fixed;inset:0;background:rgba(33,51,99,.6);z-index:200;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto}
 .print-modal{background:#fff;width:100%;max-width:800px;margin:auto;border-radius:8px;box-shadow:0 8px 40px rgba(0,0,0,.25);overflow:hidden}
@@ -371,7 +366,6 @@ function SubvencimientosBloque({ cert, subvencimientos, onAdd, onEdit, onDelete 
   const svDeCert = subvencimientos.filter(s => s.certificado_id === cert.id);
   const hayProximos = svDeCert.some(s => { const d = diasHasta(s.fecha_hasta); return d !== null && d >= 0 && d <= 90; });
 
-  // Si no hay subvencimientos, mostrar solo un botón compacto para agregar
   if (svDeCert.length === 0) {
     return (
       <div style={{ marginTop: 4, marginBottom: 4 }}>
@@ -568,18 +562,42 @@ function PrintModal({ buque, tipo, certs, subvencimientos, onClose }) {
   const tipoLabel = tipo === "estatutario" ? "Certificados Estatutarios" : "Certificados de Equipos";
   const fechaStr = new Date().toLocaleDateString("es-AR");
 
+  const handlePrint = () => {
+    const el = document.getElementById("print-content-area");
+    if (!el) return;
+    const win = window.open("", "_blank", "width=900,height=700");
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+      <title>${buque} — ${tipoLabel}</title>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Montserrat',sans-serif;font-size:12px;color:#213363;padding:28px 32px;background:#fff}
+        @page{size:A4;margin:14mm 12mm}
+        table{width:100%;border-collapse:collapse;font-size:10px}
+        th{font-size:8px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#6381A7;padding:5px 8px;text-align:left;border-bottom:1.5px solid #D6E0ED;background:#F5F7FA;white-space:nowrap}
+        td{padding:5px 8px;border-bottom:.5px solid #D6E0ED;vertical-align:top}
+        tr:last-child td{border-bottom:none}
+        .psv-row{background:#F9FFFE}
+        .psv-row td{padding:3px 8px 3px 22px;font-size:9px;color:#6381A7;border-bottom:1px dashed #BBF7D0}
+        .pchip{display:inline-flex;font-family:'DM Mono',monospace;font-size:8px;font-weight:700;padding:2px 6px;border-radius:3px}
+      </style>
+    </head><body>${el.innerHTML}</body></html>`);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 400);
+  };
+
   return (
-    <div className="print-overlay no-print" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="print-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="print-modal">
-        <div className="print-modal-bar no-print">
+        <div className="print-modal-bar">
           <div><div style={{ fontWeight: 700, fontSize: 14 }}>Vista previa · {buque}</div><div style={{ fontSize: 11, opacity: .7, marginTop: 2 }}>{tipoLabel}</div></div>
           <div style={{ display: "flex", gap: 8 }}>
             <button className="btn btn-ghost btn-sm" style={{ color: "#fff", borderColor: "rgba(255,255,255,.3)" }} onClick={onClose}>✕ Cerrar</button>
-            <button className="btn btn-sm" style={{ background: "#fff", color: "var(--navy)" }} onClick={() => window.print()}>🖨️ Imprimir / Guardar PDF</button>
+            <button className="btn btn-sm" style={{ background: "#fff", color: "var(--navy)" }} onClick={handlePrint}>🖨️ Imprimir / Guardar PDF</button>
           </div>
         </div>
-        <div className="print-body">
-          {/* ── ENCABEZADO CON NOMBRE DEL BUQUE ── */}
+        <div className="print-body" id="print-content-area">
           <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 8 }}>
             <img src="/pL.png" alt="" style={{ width: 48, height: 48, borderRadius: "50%", border: "2px solid var(--navy)", objectFit: "cover" }} onError={e => e.target.style.display = "none"} />
             <div>
@@ -776,7 +794,7 @@ function PageTabla({ certs, buque, tipo, subvencimientos, onSelect, onNuevo, onS
                           <td style={{ textAlign: "center" }}>{c.documento_url ? <a href={c.documento_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 14, color: "var(--blue)" }}>📎</a> : <span style={{ color: "var(--muted2)", fontSize: 11 }}>—</span>}</td>
                         </tr>
                         {tipo === "estatutario" && (
-                          <tr key={`sv-${c.id}`} className="no-print">
+                          <tr key={`sv-${c.id}`}>
                             <td colSpan={9} style={{ padding: 0, paddingLeft: 44, paddingRight: 12, background: rowBg }}>
                               <SubvencimientosBloque cert={c} subvencimientos={subvencimientos} onAdd={() => setModalSv({ certId: c.id, sv: null })} onEdit={sv => setModalSv({ certId: c.id, sv })} onDelete={handleDeleteSv} />
                             </td>

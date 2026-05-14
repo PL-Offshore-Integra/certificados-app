@@ -269,18 +269,27 @@ function FG({ label, hint, children, full }) {
     {hint && <div style={{ fontSize: 10, color: "var(--muted2)", marginTop: 2 }}>{hint}</div>}
   </div>;
 }
+function formatDias(dias) {
+  if (dias === null) return null;
+  const abs = Math.abs(dias);
+  if (abs <= 60) return `${abs}d`;
+  if (abs < 365) return `${Math.round(abs / 30)}m`;
+  const years = Math.floor(abs / 365);
+  const mesesRestantes = Math.round((abs % 365) / 30);
+  return mesesRestantes > 0 ? `${years}a ${mesesRestantes}m` : `${years}a`;
+}
 function DiasChip({ fechaStr }) {
   const dias = diasHasta(fechaStr);
   if (dias === null) return <span className="dias-chip dias-sin">Sin fecha</span>;
   const cls = dias < 0 ? "dias-vencido" : dias <= 30 ? "dias-critico" : dias <= 90 ? "dias-proximo" : "dias-ok";
-  const label = dias < 0 ? `Vencido ${Math.abs(dias)}d` : dias === 0 ? "Vence hoy" : `${dias}d`;
+  const label = dias < 0 ? `Vencido ${formatDias(dias)}` : dias === 0 ? "Vence hoy" : formatDias(dias);
   return <span className={`dias-chip ${cls}`}>{label}</span>;
 }
 function PrintChip({ fechaStr }) {
   const dias = diasHasta(fechaStr);
   if (dias === null) return <span className="pchip" style={{ background: "#F3F4F6", color: "#6B7280" }}>Sin fecha</span>;
   const [bg, col] = dias < 0 ? ["#FEE2E2", "#991B1B"] : dias <= 30 ? ["#FFEDD5", "#9A3412"] : dias <= 90 ? ["#FEF3C7", "#92400E"] : ["#D1FAE5", "#065F46"];
-  return <span className="pchip" style={{ background: bg, color: col }}>{dias < 0 ? `Venc.${Math.abs(dias)}d` : `${dias}d`}</span>;
+  return <span className="pchip" style={{ background: bg, color: col }}>{dias < 0 ? `Venc.${formatDias(dias)}` : formatDias(dias)}</span>;
 }
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
@@ -319,6 +328,17 @@ function LoginScreen({ onLogin }) {
 // ─── MODAL SUBVENCIMIENTO ─────────────────────────────────────────────────────
 function ModalSubvencimiento({ certId, sv, onClose, onSave, notify }) {
   const esNuevo = !sv?.id; const fileRef = useRef();
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key !== "Escape" && e.key !== "Delete") return;
+      const active = document.activeElement;
+      const enInput = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT");
+      const haySeleccion = window.getSelection && window.getSelection().toString().length > 0;
+      if (!enInput && !haySeleccion) onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
   const [form, setForm] = useState({ descripcion: sv?.descripcion || "", fecha_desde: sv?.fecha_desde || "", fecha_hasta: sv?.fecha_hasta || "", observaciones: sv?.observaciones || "", documento_url: sv?.documento_url || "", documento_nombre: sv?.documento_nombre || "" });
   const [saving, setSaving] = useState(false); const [uploading, setUploading] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -336,7 +356,7 @@ function ModalSubvencimiento({ certId, sv, onClose, onSave, notify }) {
     } catch (e) { notify("Error: " + e.message, "error"); } finally { setSaving(false); }
   };
   return (
-    <div className="overlay" style={{ zIndex: 200 }} onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="overlay" style={{ zIndex: 200 }}>
       <div className="modal" style={{ maxWidth: 520 }}>
         <div className="mhdr"><div className="mtitle">{esNuevo ? "Nueva verificación / subvencimiento" : "Editar verificación"}</div><button className="mclose" onClick={onClose}>✕</button></div>
         <div className="mbody">
@@ -394,7 +414,7 @@ function SubvencimientosBloque({ cert, subvencimientos, onAdd, onEdit, onDelete 
                 <span className="sv-num">{i + 1}°</span>
                 <span className="sv-desc">{s.descripcion}</span>
                 <span className="sv-dates">{s.fecha_desde && s.fecha_hasta ? `${fmtDate(s.fecha_desde)} → ${fmtDate(s.fecha_hasta)}` : s.fecha_hasta ? `Hasta: ${fmtDate(s.fecha_hasta)}` : s.fecha_desde ? `Desde: ${fmtDate(s.fecha_desde)}` : "Sin fechas"}</span>
-                {s.fecha_hasta && <span className={`dias-chip ${alertCls}`} style={{ fontSize: 9 }}>{diasD !== null ? (diasD < 0 ? `Venc.${Math.abs(diasD)}d` : diasD === 0 ? "Hoy" : `${diasD}d`) : "—"}</span>}
+                {s.fecha_hasta && <span className={`dias-chip ${alertCls}`} style={{ fontSize: 9 }}>{diasD !== null ? (diasD < 0 ? `Venc.${formatDias(diasD)}` : diasD === 0 ? "Hoy" : formatDias(diasD)) : "—"}</span>}
                 {s.documento_url && <a href={s.documento_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 12 }} title={s.documento_nombre}>📎</a>}
                 <button onClick={e => { e.stopPropagation(); onEdit(s); }} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 11 }}>✏</button>
                 <button onClick={e => { e.stopPropagation(); onDelete(s.id); }} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", fontSize: 11 }}>🗑</button>
@@ -411,6 +431,17 @@ function SubvencimientosBloque({ cert, subvencimientos, onAdd, onEdit, onDelete 
 // ─── MODAL EDITAR/CREAR CERT ──────────────────────────────────────────────────
 function ModalCert({ cert, onClose, onSave, notify }) {
   const esNuevo = !cert.id; const fileRef = useRef();
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key !== "Escape" && e.key !== "Delete") return;
+      const active = document.activeElement;
+      const enInput = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT");
+      const haySeleccion = window.getSelection && window.getSelection().toString().length > 0;
+      if (!enInput && !haySeleccion) onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose]);
   const [form, setForm] = useState({
     buque: cert.buque || "Atlantic Dama", tipo: cert.tipo || "estatutario", seccion: cert.seccion || "GENERAL",
     descripcion: cert.descripcion || "", nro_certificado: cert.nro_certificado || "",
@@ -438,7 +469,7 @@ function ModalCert({ cert, onClose, onSave, notify }) {
     } catch (e) { notify("Error: " + e.message, "error"); } finally { setSaving(false); }
   };
   return (
-    <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="overlay">
       <div className="modal">
         <div className="mhdr"><div className="mtitle">{esNuevo ? "Nuevo certificado" : "Editar certificado"}</div><button className="mclose" onClick={onClose}>✕</button></div>
         <div className="mbody">
@@ -476,6 +507,18 @@ function ModalCert({ cert, onClose, onSave, notify }) {
 function ModalVerCert({ cert, subvencimientos, onClose, onEdit, onDelete, notify, onSubvencimientosChange }) {
   const [confirmDelete, setConfirmDelete] = useState(false); const [deleting, setDeleting] = useState(false);
   const [modalSv, setModalSv] = useState(null);
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.key !== "Escape" && e.key !== "Delete") return;
+      if (modalSv) return; // si hay submodal abierto, no cerrar el padre
+      const active = document.activeElement;
+      const enInput = active && (active.tagName === "INPUT" || active.tagName === "TEXTAREA" || active.tagName === "SELECT");
+      const haySeleccion = window.getSelection && window.getSelection().toString().length > 0;
+      if (!enInput && !haySeleccion) onClose();
+    };
+    document.addEventListener("keydown", handler);
+    return () => document.removeEventListener("keydown", handler);
+  }, [onClose, modalSv]);
   const esEstat = cert.tipo === "estatutario";
   const fechaRef = esEstat ? cert.fecha_vencimiento : cert.fecha_proximo_servicio;
   const dias = diasHasta(fechaRef);
@@ -491,7 +534,7 @@ function ModalVerCert({ cert, subvencimientos, onClose, onEdit, onDelete, notify
   };
   return (
     <>
-      <div className="overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="overlay">
         <div className="modal modal-wide">
           <div className="mhdr">
             <div>

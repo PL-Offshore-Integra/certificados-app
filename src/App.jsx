@@ -500,8 +500,8 @@ function LoginScreen({ onLogin }) {
             </div>
             <div className="login-left-divider" />
             <div className="login-left-company">
-              <img src="/pL.png" alt="Parana Logística" className="login-left-company-logo" />
-              <div className="login-left-company-name">Parana Logística | Certificados</div>
+              <img src="/PL.png" alt="PL Offshore" className="login-left-company-logo" />
+              <div className="login-left-company-name">PL Offshore | Certificados</div>
             </div>
             <div className="login-left-line" />
             <div className="login-left-sub">We Find the Way, or We Make One.</div>
@@ -510,7 +510,7 @@ function LoginScreen({ onLogin }) {
           {/* ── Derecha: formulario ── */}
           <div className="login-right">
             <div className="login-card">
-              <div className="login-card-eyebrow">Parana Logística | Certificados</div>
+              <div className="login-card-eyebrow">PL Offshore | Certificados</div>
               <div className="login-card-title">Acceso al portal</div>
               <div className="login-card-sub">Solo personal autorizado</div>
               {error && <div className="login-error">{error}</div>}
@@ -822,9 +822,9 @@ function PrintModal({ buque, tipo, certs, subvencimientos, onClose }) {
         </div>
         <div className="print-body" id="print-content-area">
           <div style={{ display: "flex", alignItems: "center", gap: 16, marginBottom: 8 }}>
-            <img src="/pL.png" alt="" style={{ width: 48, height: 48, borderRadius: "50%", border: "2px solid var(--navy)", objectFit: "cover" }} onError={e => e.target.style.display = "none"} />
+            <img src="/PL.png" alt="" style={{ width: 48, height: 48, borderRadius: "50%", border: "2px solid var(--navy)", objectFit: "cover" }} onError={e => e.target.style.display = "none"} />
             <div>
-              <div style={{ fontSize: 10, fontFamily: "var(--mono)", color: "var(--muted)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 2 }}>Parana Logística S.A.</div>
+              <div style={{ fontSize: 10, fontFamily: "var(--mono)", color: "var(--muted)", letterSpacing: 1, textTransform: "uppercase", marginBottom: 2 }}>PL Offshore S.A.</div>
               <div style={{ fontSize: 28, fontWeight: 700, color: "var(--navy)", lineHeight: 1.1, letterSpacing: "-.5px" }}>{buque}</div>
             </div>
           </div>
@@ -888,7 +888,7 @@ function PrintModal({ buque, tipo, certs, subvencimientos, onClose }) {
             );
           })}
           <div style={{ marginTop: 18, borderTop: "1px solid var(--border)", paddingTop: 8, display: "flex", justifyContent: "space-between", fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)" }}>
-            <span>Parana Logística S.A. · Sistema de Certificados v1.3</span>
+            <span>PL Offshore S.A. · Sistema de Certificados v1.3</span>
             <span>{fechaStr}</span>
           </div>
         </div>
@@ -1226,10 +1226,10 @@ export default function App() {
           <div className="sidebar-header">
             <div className="sidebar-logo-wrap">
               {/* [DS-3.2] logo circular 36×36 border 2px white 20% */}
-              <img src="/pL.png" alt="PL" className="sidebar-logo-img" />
+              <img src="/PL.png" alt="PL" className="sidebar-logo-img" />
               <div>
                 <div className="sidebar-logo-main">Certificados</div>
-                <div className="sidebar-logo-sub">Parana Logística</div>
+                <div className="sidebar-logo-sub">PL Offshore</div>
               </div>
             </div>
           </div>

@@ -1205,6 +1205,7 @@ function PageAlertas({ certs, subvencimientos, onSelect }) {
 //  ROOT APP 
 export default function App() {
   const [session, setSession] = useState(null);
+  const [navOpen, setNavOpen] = useState(true);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [page, setPage] = useState("alertas");
   const [certs, setCerts] = useState([]);
@@ -1251,8 +1252,6 @@ export default function App() {
     </div>
   );
   if (!session) return <LoginScreen onLogin={() => supabase.auth.getSession().then(({ data: { session } }) => setSession(session))} />;
-
-  const [navOpen, setNavOpen] = useState(true);
 
   const Ico = ({ d, size = 18 }) => (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"

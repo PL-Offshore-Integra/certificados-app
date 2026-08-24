@@ -769,6 +769,7 @@ function ModalCert({ cert, onClose, onSave, notify }) {
     fecha_emision: cert.fecha_emision || "", fecha_vencimiento: cert.fecha_vencimiento || "",
     fecha_ultimo_servicio: cert.fecha_ultimo_servicio || "", fecha_proximo_servicio: cert.fecha_proximo_servicio || "",
     observaciones: cert.observaciones || "", documento_url: cert.documento_url || "", documento_nombre: cert.documento_nombre || "",
+    requiere_solicitud: cert.requiere_solicitud || false, nro_solicitud: cert.nro_solicitud || "", responsable_final: cert.responsable_final || "",
   });
   const [saving, setSaving] = useState(false); const [uploading, setUploading] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -784,7 +785,7 @@ function ModalCert({ cert, onClose, onSave, notify }) {
     setSaving(true);
     try {
       const fechaRef = esEstat ? form.fecha_vencimiento : form.fecha_proximo_servicio;
-      const payload = { buque: form.buque, tipo: form.tipo, seccion: form.seccion, descripcion: form.descripcion, nro_certificado: form.nro_certificado || null, emitido_por: form.emitido_por || null, nro_serie: form.nro_serie || null, proveedor: form.proveedor || null, fecha_emision: form.fecha_emision || null, fecha_vencimiento: form.fecha_vencimiento || null, fecha_ultimo_servicio: form.fecha_ultimo_servicio || null, fecha_proximo_servicio: form.fecha_proximo_servicio || null, observaciones: form.observaciones || null, documento_url: form.documento_url || null, documento_nombre: form.documento_nombre || null, dias_vencimiento: diasHasta(fechaRef), activo: true };
+      const payload = { buque: form.buque, tipo: form.tipo, seccion: form.seccion, descripcion: form.descripcion, nro_certificado: form.nro_certificado || null, emitido_por: form.emitido_por || null, nro_serie: form.nro_serie || null, proveedor: form.proveedor || null, fecha_emision: form.fecha_emision || null, fecha_vencimiento: form.fecha_vencimiento || null, fecha_ultimo_servicio: form.fecha_ultimo_servicio || null, fecha_proximo_servicio: form.fecha_proximo_servicio || null, observaciones: form.observaciones || null, documento_url: form.documento_url || null, documento_nombre: form.documento_nombre || null, requiere_solicitud: form.requiere_solicitud, nro_solicitud: form.requiere_solicitud ? (form.nro_solicitud || null) : null, responsable_final: form.responsable_final || null, dias_vencimiento: diasHasta(fechaRef), activo: true };
       const saved = cert.id ? await api.updateCertificado(cert.id, payload) : await api.insertCertificado(payload);
       notify(esNuevo ? "Certificado creado" : "Actualizado", "success"); onSave(saved);
     } catch (e) { notify("Error: " + e.message, "error"); } finally { setSaving(false); }
@@ -810,6 +811,19 @@ function ModalCert({ cert, onClose, onSave, notify }) {
             : <div className="form-grid"><FG label="Último servicio"><input type="date" value={form.fecha_ultimo_servicio} onChange={e => set("fecha_ultimo_servicio", e.target.value)} /></FG><FG label="Próximo servicio"><input type="date" value={form.fecha_proximo_servicio} onChange={e => set("fecha_proximo_servicio", e.target.value)} /></FG></div>
           }
           <FG label="Observaciones" full><textarea value={form.observaciones} onChange={e => set("observaciones", e.target.value)} placeholder="Notas..." /></FG>
+          <div className="form-section">Gestión</div>
+          <div className="form-grid">
+            <FG label="¿Requiere solicitud de provisión / servicio?">
+              <select value={form.requiere_solicitud ? "si" : "no"} onChange={e => { const si = e.target.value === "si"; set("requiere_solicitud", si); if (!si) set("nro_solicitud", ""); }}>
+                <option value="no">No</option>
+                <option value="si">Sí</option>
+              </select>
+            </FG>
+            <FG label="N° de solicitud" hint={form.requiere_solicitud ? "" : "Se habilita al marcar “Sí”"}>
+              <input value={form.nro_solicitud} onChange={e => set("nro_solicitud", e.target.value)} disabled={!form.requiere_solicitud} placeholder={form.requiere_solicitud ? "Ej: SOL-2026-014" : "—"} />
+            </FG>
+          </div>
+          <FG label="Responsable final" full><input value={form.responsable_final} onChange={e => set("responsable_final", e.target.value)} placeholder="Nombre del responsable..." /></FG>
           <div className="mt16">
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: .5, textTransform: "uppercase", color: "var(--navy)", marginBottom: 8 }}>Documento adjunto</div>
             <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: "none" }} onChange={e => handleUpload(e.target.files[0])} />
@@ -879,6 +893,13 @@ function ModalVerCert({ cert, subvencimientos, onClose, onEdit, onDelete, notify
                 </div>
               </>}
               {cert.nro_serie && <div className="info-box"><div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>N° Serie</div>{cert.nro_serie}</div>}
+              <div className="info-box">
+                <div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>Solicitud provisión / servicio</div>
+                {cert.requiere_solicitud
+                  ? <span><span className="badge b-amber" style={{ marginRight: 6 }}>Requiere</span>{cert.nro_solicitud ? <span className="text-mono">N° {cert.nro_solicitud}</span> : <span style={{ color: "var(--muted2)" }}>sin N° cargado</span>}</span>
+                  : <span style={{ color: "var(--muted)" }}>No requiere</span>}
+              </div>
+              <div className="info-box"><div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>Responsable final</div>{cert.responsable_final || "—"}</div>
             </div>
             {cert.observaciones && <div className="info-box mt8" style={{ fontSize: 12 }}><strong>Obs:</strong> {cert.observaciones}</div>}
             {cert.documento_url && <div className="doc-adjunto mt8"><span></span><a href={cert.documento_url} target="_blank" rel="noreferrer" style={{ color: "var(--blue)", flex: 1 }}>{cert.documento_nombre || "Ver documento adjunto"}</a></div>}

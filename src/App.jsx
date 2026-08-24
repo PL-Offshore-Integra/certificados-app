@@ -22,10 +22,45 @@ function diasHasta(fechaStr) {
 }
 function getAlertColor(dias) {
   if (dias === null) return null;
-  if (dias < 0) return "vencido";
-  if (dias <= 30) return "critico";
-  if (dias <= 90) return "proximo";
-  return "ok";
+  if (dias < 0) return "vencido";   // rojo
+  if (dias <= 60) return "critico"; // amarillo (<= 60 dias)
+  return "ok";                       // verde (> 60 dias)
+}
+//  SEMAFORO DE VENCIMIENTOS  (rojo <0 / amarillo <=60 / verde >60)
+function claseDias(dias) {
+  if (dias === null) return "dias-sin";
+  if (dias < 0) return "dias-vencido";
+  if (dias <= 60) return "dias-critico";
+  return "dias-ok";
+}
+// Duracion (dias >= 0): hasta 60 -> dias; despues -> meses o anios
+function fmtDuracion(dias) {
+  if (dias <= 60) return `${dias}d`;
+  if (dias < 365) { const m = Math.round(dias / 30.44); return `${m} ${m === 1 ? "mes" : "meses"}`; }
+  const a = Math.floor(dias / 365), m = Math.round((dias % 365) / 30.44);
+  if (m >= 12) return `${a + 1} ${a + 1 === 1 ? "año" : "años"}`;
+  if (m === 0) return `${a} ${a === 1 ? "año" : "años"}`;
+  return `${a}a ${m}m`;
+}
+function fmtDuracionCompact(dias) {
+  if (dias <= 60) return `${dias}d`;
+  if (dias < 365) { const m = Math.round(dias / 30.44); return `${m}m`; }
+  const a = Math.floor(dias / 365), m = Math.round((dias % 365) / 30.44);
+  if (m >= 12) return `${a + 1}a`;
+  if (m === 0) return `${a}a`;
+  return `${a}a ${m}m`;
+}
+function labelDias(dias) {
+  if (dias === null) return "Sin fecha";
+  if (dias === 0) return "Vence hoy";
+  if (dias < 0) return `Vencido ${fmtDuracion(Math.abs(dias))}`;
+  return fmtDuracion(dias);
+}
+function labelDiasCompact(dias) {
+  if (dias === null) return "—";
+  if (dias === 0) return "Hoy";
+  if (dias < 0) return `Venc. ${fmtDuracionCompact(Math.abs(dias))}`;
+  return fmtDuracionCompact(dias);
 }
 function fechaDefault90() { const d = new Date(); d.setDate(d.getDate() + 90); return d.toISOString().slice(0, 10); }
 function fechaHoy() { return new Date().toISOString().slice(0, 10); }
@@ -445,6 +480,23 @@ tr.click:hover td{background:var(--surface2);cursor:pointer}
   .main{padding-bottom:72px}
 }
 
+/*  SEMAFORO DE VENCIMIENTOS · rojo=vencido · amarillo<=60d · verde>60d  */
+.dias-chip{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:11px;font-weight:600;padding:3px 9px;border-radius:3px;white-space:nowrap;letter-spacing:.02em;line-height:1.25;font-variant-numeric:tabular-nums}
+.dias-chip::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;flex-shrink:0;opacity:.85}
+.dias-vencido{background:#FAEAE8;color:#B3261E}
+.dias-critico{background:#FBF1E3;color:#8F5A0B}
+.dias-ok{background:#E8F3EF;color:#0E7A5F}
+.dias-sin{background:#F4F6F8;color:#7A8792}
+.dias-sin::before{opacity:.5}
+
+/*  VISIBILIDAD TABLA vs TARJETAS · evita el resumen duplicado en desktop  */
+.desktop-table{display:block}
+.mobile-cards{display:none}
+@media(max-width:768px){
+  .desktop-table{display:none}
+  .mobile-cards{display:block}
+}
+
 `;
 
 //  HELPERS 
@@ -461,16 +513,16 @@ function FG({ label, hint, children, full }) {
 }
 function DiasChip({ fechaStr }) {
   const dias = diasHasta(fechaStr);
-  if (dias === null) return <span className="dias-chip dias-sin">Sin fecha</span>;
-  const cls = dias < 0 ? "dias-vencido" : dias <= 30 ? "dias-critico" : dias <= 90 ? "dias-proximo" : "dias-ok";
-  const label = dias < 0 ? `Vencido ${Math.abs(dias)}d` : dias === 0 ? "Vence hoy" : `${dias}d`;
-  return <span className={`dias-chip ${cls}`}>{label}</span>;
+  return <span className={`dias-chip ${claseDias(dias)}`}>{labelDias(dias)}</span>;
 }
 function PrintChip({ fechaStr }) {
   const dias = diasHasta(fechaStr);
-  if (dias === null) return <span className="pchip" style={{ background: "#F3F4F6", color: "#6B7280" }}>Sin fecha</span>;
-  const [bg, col] = dias < 0 ? ["#FEE2E2", "#991B1B"] : dias <= 30 ? ["#FFEDD5", "#9A3412"] : dias <= 90 ? ["#FEF3C7", "#92400E"] : ["#D1FAE5", "#065F46"];
-  return <span className="pchip" style={{ background: bg, color: col }}>{dias < 0 ? `Venc.${Math.abs(dias)}d` : `${dias}d`}</span>;
+  // El PDF se abre en otra ventana sin el CSS de la app: van colores inline. Mismo umbral de 60 dias.
+  const [bg, col] = dias === null ? ["#F3F4F6", "#6B7280"]
+    : dias < 0 ? ["#FEE2E2", "#991B1B"]
+    : dias <= 60 ? ["#FEF3C7", "#92400E"]
+    : ["#D1FAE5", "#065F46"];
+  return <span className="pchip" style={{ background: bg, color: col }}>{labelDiasCompact(dias)}</span>;
 }
 
 //  LOGIN PAGE — DS §8.7 / §9.1-C / §11.12.3 
@@ -658,13 +710,13 @@ function SubvencimientosBloque({ cert, subvencimientos, onAdd, onEdit, onDelete 
         <div className="sv-list">
           {svDeCert.map((s, i) => {
             const diasD = diasHasta(s.fecha_hasta);
-            const alertCls = diasD === null ? "dias-sin" : diasD < 0 ? "dias-vencido" : diasD <= 30 ? "dias-critico" : diasD <= 90 ? "dias-proximo" : "dias-ok";
+            const alertCls = claseDias(diasD);
             return (
               <div key={s.id} className="sv-item">
                 <span className="sv-num">{i + 1}°</span>
                 <span className="sv-desc">{s.descripcion}</span>
                 <span className="sv-dates">{s.fecha_desde && s.fecha_hasta ? `${fmtDate(s.fecha_desde)} → ${fmtDate(s.fecha_hasta)}` : s.fecha_hasta ? `Hasta: ${fmtDate(s.fecha_hasta)}` : s.fecha_desde ? `Desde: ${fmtDate(s.fecha_desde)}` : "Sin fechas"}</span>
-                {s.fecha_hasta && <span className={`dias-chip ${alertCls}`}>{diasD !== null ? (diasD < 0 ? `Venc.${Math.abs(diasD)}d` : diasD === 0 ? "Hoy" : `${diasD}d`) : "—"}</span>}
+                {s.fecha_hasta && <span className={`dias-chip ${alertCls}`}>{labelDiasCompact(diasD)}</span>}
                 {s.documento_url && <a href={s.documento_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 12 }} title={s.documento_nombre}></a>}
                 <button onClick={e => { e.stopPropagation(); onEdit(s); }} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 11 }}></button>
                 <button onClick={e => { e.stopPropagation(); onDelete(s.id); }} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", fontSize: 11 }}></button>
@@ -784,17 +836,17 @@ function ModalVerCert({ cert, subvencimientos, onClose, onEdit, onDelete, notify
                 <div className="info-box"><div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>Emitido por</div>{cert.emitido_por || "—"}</div>
                 <div className="info-box"><div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>N° Certificado</div>{cert.nro_certificado || "—"}</div>
                 <div className="info-box"><div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>Fecha emisión</div>{fmtDate(cert.fecha_emision)}</div>
-                <div className="info-box" style={{ background: dias !== null && dias < 0 ? "#FEF2F2" : dias !== null && dias <= 30 ? "#FFF7ED" : undefined }}>
+                <div className="info-box" style={{ background: dias !== null && dias < 0 ? "#FEF2F2" : dias !== null && dias <= 60 ? "#FFF7ED" : undefined }}>
                   <div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>Fecha vencimiento</div>
-                  <strong style={{ color: dias !== null && dias < 0 ? "var(--danger)" : dias !== null && dias <= 30 ? "var(--orange)" : "inherit" }}>{fmtDate(cert.fecha_vencimiento)}</strong>
+                  <strong style={{ color: dias !== null && dias < 0 ? "var(--danger)" : dias !== null && dias <= 60 ? "var(--orange)" : "inherit" }}>{fmtDate(cert.fecha_vencimiento)}</strong>
                 </div>
               </> : <>
                 <div className="info-box"><div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>Proveedor</div>{cert.proveedor || "—"}</div>
                 <div className="info-box"><div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>N° Certificado</div>{cert.nro_certificado || "—"}</div>
                 <div className="info-box"><div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>Último servicio</div>{fmtDate(cert.fecha_ultimo_servicio)}</div>
-                <div className="info-box" style={{ background: dias !== null && dias < 0 ? "#FEF2F2" : dias !== null && dias <= 30 ? "#FFF7ED" : undefined }}>
+                <div className="info-box" style={{ background: dias !== null && dias < 0 ? "#FEF2F2" : dias !== null && dias <= 60 ? "#FFF7ED" : undefined }}>
                   <div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>Próximo servicio</div>
-                  <strong style={{ color: dias !== null && dias < 0 ? "var(--danger)" : dias !== null && dias <= 30 ? "var(--orange)" : "inherit" }}>{fmtDate(cert.fecha_proximo_servicio)}</strong>
+                  <strong style={{ color: dias !== null && dias < 0 ? "var(--danger)" : dias !== null && dias <= 60 ? "var(--orange)" : "inherit" }}>{fmtDate(cert.fecha_proximo_servicio)}</strong>
                 </div>
               </>}
               {cert.nro_serie && <div className="info-box"><div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>N° Serie</div>{cert.nro_serie}</div>}
@@ -904,8 +956,8 @@ function PrintModal({ buque, tipo, certs, subvencimientos, onClose }) {
                     {items.map(c => {
                       const fechaRef = getFechaRef(c);
                       const dias = diasHasta(fechaRef);
-                      const col = dias !== null && dias < 0 ? "var(--danger)" : dias !== null && dias <= 30 ? "var(--orange)" : dias !== null && dias <= 90 ? "var(--warn)" : "inherit";
-                      const rowBg = dias !== null && dias < 0 ? "#FFF5F5" : dias !== null && dias <= 30 ? "#FFFAF5" : "inherit";
+                      const col = dias !== null && dias < 0 ? "var(--danger)" : dias !== null && dias <= 60 ? "var(--warn)" : "inherit";
+                      const rowBg = dias !== null && dias < 0 ? "#FFF5F5" : dias !== null && dias <= 60 ? "#FFFAF5" : "inherit";
                       const svDeCert = subvencimientos.filter(s => s.certificado_id === c.id);
                       return (
                         <>
@@ -1040,7 +1092,7 @@ function PageTabla({ certs, buque, tipo, subvencimientos, onSelect, onNuevo, onS
                     const fechaRef = getFechaRef(c);
                     const dias = diasHasta(fechaRef);
                     const alertColor = getAlertColor(dias);
-                    const rowBg = alertColor === "vencido" ? "#FFF5F5" : alertColor === "critico" ? "#FFFAF5" : alertColor === "proximo" ? "#FFFEF5" : "inherit";
+                    const rowBg = alertColor === "vencido" ? "#FFF5F5" : alertColor === "critico" ? "#FFFAF5" : "inherit";
                     const svDeCert = subvencimientos.filter(s => s.certificado_id === c.id);
                     return (
                       <>
@@ -1058,7 +1110,7 @@ function PageTabla({ certs, buque, tipo, subvencimientos, onSelect, onNuevo, onS
                           <td className="text-mono" style={{ fontSize: 10, color: "var(--muted)" }}>{c.nro_certificado || "—"}</td>
                           <td style={{ fontSize: 11, color: "var(--muted)" }}>{tipo === "estatutario" ? (c.emitido_por || "—") : (c.proveedor || "—")}</td>
                           <td className="text-mono" style={{ fontSize: 11, color: "var(--muted)" }}>{tipo === "estatutario" ? fmtDate(c.fecha_emision) : fmtDate(c.fecha_ultimo_servicio)}</td>
-                          <td className="text-mono" style={{ fontSize: 11, fontWeight: fechaRef ? 600 : 400, color: alertColor === "vencido" ? "var(--danger)" : alertColor === "critico" ? "var(--orange)" : alertColor === "proximo" ? "var(--warn)" : "var(--navy)" }}>
+                          <td className="text-mono" style={{ fontSize: 11, fontWeight: fechaRef ? 600 : 400, color: alertColor === "vencido" ? "var(--danger)" : alertColor === "critico" ? "var(--orange)" : "var(--navy)" }}>
                             {tipo === "estatutario" ? fmtDate(c.fecha_vencimiento) : fmtDate(c.fecha_proximo_servicio)}
                           </td>
                           <td><DiasChip fechaStr={fechaRef} /></td>
@@ -1134,7 +1186,7 @@ function PageAlertas({ certs, subvencimientos, onSelect }) {
     });
   });
   itemsEnRango.sort((a, b) => a.fechaRef.localeCompare(b.fechaRef));
-  const getAlertClass = f => { const d = diasHasta(f); if (d === null) return ""; if (d < 0) return "vencido"; if (d <= 30) return "critico"; if (d <= 90) return "proximo"; return ""; };
+  const getAlertClass = f => { const d = diasHasta(f); if (d === null) return ""; if (d < 0) return "vencido"; if (d <= 60) return "critico"; return ""; };
 
   return (
     <div>

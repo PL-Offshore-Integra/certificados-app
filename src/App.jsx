@@ -1145,7 +1145,7 @@ function PageTabla({ certs, buque, tipo, subvencimientos, onSelect, onNuevo, onS
                     {tipo === "estatutario"
                       ? <><th>N° Cert.</th><th>Emitido por</th><th>Fecha emisión</th><th>Fecha vencimiento</th></>
                       : <><th>N° Cert.</th><th>Proveedor</th><th>Último servicio</th><th>Próximo servicio</th></>}
-                    <th>Estado</th><th>Doc.</th>
+                    <th>Estado</th><th>Solicitud</th><th>Responsable final</th><th>Doc.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1175,11 +1175,19 @@ function PageTabla({ certs, buque, tipo, subvencimientos, onSelect, onNuevo, onS
                             {tipo === "estatutario" ? fmtDate(c.fecha_vencimiento) : fmtDate(c.fecha_proximo_servicio)}
                           </td>
                           <td><DiasChip fechaStr={fechaRef} /></td>
+                          <td style={{ fontSize: 11 }}>
+                            {c.requiere_solicitud
+                              ? (c.nro_solicitud
+                                  ? <span className="text-mono" style={{ color: "var(--navy)" }}>{c.nro_solicitud}</span>
+                                  : <span className="badge b-amber">Sí · s/n°</span>)
+                              : <span style={{ color: "var(--muted2)" }}>No</span>}
+                          </td>
+                          <td style={{ fontSize: 11, color: c.responsable_final ? "var(--text)" : "var(--muted2)" }}>{c.responsable_final || "—"}</td>
                           <td style={{ textAlign: "center" }}>{c.documento_url ? <a href={c.documento_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 14, color: "var(--blue)" }}></a> : <span style={{ color: "var(--muted2)", fontSize: 11 }}>—</span>}</td>
                         </tr>
                         {tipo === "estatutario" && (
                           <tr key={`sv-${c.id}`}>
-                            <td colSpan={9} style={{ padding: 0, paddingLeft: 44, paddingRight: 12, background: rowBg }}>
+                            <td colSpan={11} style={{ padding: 0, paddingLeft: 44, paddingRight: 12, background: rowBg }}>
                               <SubvencimientosBloque cert={c} subvencimientos={subvencimientos} onAdd={() => setModalSv({ certId: c.id, sv: null })} onEdit={sv => setModalSv({ certId: c.id, sv })} onDelete={handleDeleteSv} />
                             </td>
                           </tr>
@@ -1205,6 +1213,9 @@ function PageTabla({ certs, buque, tipo, subvencimientos, onSelect, onNuevo, onS
                       <DiasChip fechaStr={fechaRef} />
                     </div>
                     <div className="mobile-card-meta">{tipo === "estatutario" ? `Vence: ${fmtDate(c.fecha_vencimiento)}` : `Próx. servicio: ${fmtDate(c.fecha_proximo_servicio)}`}{c.documento_url && <span style={{ marginLeft: 8, color: "var(--blue)" }}></span>}</div>
+                    <div className="mobile-card-meta" style={{ marginTop: 2 }}>
+                      Solicitud: {c.requiere_solicitud ? (c.nro_solicitud ? c.nro_solicitud : "Sí (s/n°)") : "No"} · Resp.: {c.responsable_final || "—"}
+                    </div>
                     {svDeCert.length > 0 && (
                       <div className="mobile-card-sv">
                         {svDeCert.slice(0, 2).map(s => <div key={s.id}>↳ {s.descripcion}{s.fecha_hasta ? ` · ${fmtDate(s.fecha_hasta)}` : ""}</div>)}

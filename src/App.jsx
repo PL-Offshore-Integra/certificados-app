@@ -729,7 +729,7 @@ function SubvencimientosBloque({ cert, subvencimientos, onAdd, onEdit, onDelete 
   return (
     <div className="sv-block" style={{ marginTop: 6 }}>
       <div className="sv-header" onClick={() => setExpanded(e => !e)}>
-        <span style={{ fontSize: 12 }}>{expanded ? "" : ""}</span>
+        <span style={{ fontSize: 10, color: "var(--muted)", width: 12, display: "inline-block" }}>{expanded ? "▾" : "▸"}</span>
         <span>Verificaciones periódicas</span>
         {/* [H20][DS-2.3] font-size mínimo 9px */}
         <span style={{ background: "#BBF7D0", color: "#166534", fontSize: 9, padding: "1px 7px", borderRadius: 10, fontFamily: "var(--mono)", fontWeight: 700 }}>{svDeCert.length}</span>
@@ -747,8 +747,8 @@ function SubvencimientosBloque({ cert, subvencimientos, onAdd, onEdit, onDelete 
                 <span className="sv-dates">{s.fecha_desde && s.fecha_hasta ? `${fmtDate(s.fecha_desde)} → ${fmtDate(s.fecha_hasta)}` : s.fecha_hasta ? `Hasta: ${fmtDate(s.fecha_hasta)}` : s.fecha_desde ? `Desde: ${fmtDate(s.fecha_desde)}` : "Sin fechas"}</span>
                 {s.fecha_hasta && <span className={`dias-chip ${alertCls}`}>{labelDiasCompact(diasD)}</span>}
                 {s.documento_url && <a href={s.documento_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 12 }} title={s.documento_nombre}></a>}
-                <button onClick={e => { e.stopPropagation(); onEdit(s); }} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 11 }}></button>
-                <button onClick={e => { e.stopPropagation(); onDelete(s.id); }} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", fontSize: 11 }}></button>
+                <button onClick={e => { e.stopPropagation(); onEdit(s); }} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 10, fontWeight: 600, textDecoration: "underline", padding: "2px 4px" }}>Editar</button>
+                <button onClick={e => { e.stopPropagation(); onDelete(s.id); }} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", fontSize: 10, fontWeight: 600, textDecoration: "underline", padding: "2px 4px" }}>Eliminar</button>
               </div>
             );
           })}

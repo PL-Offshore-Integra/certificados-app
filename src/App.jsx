@@ -3,7 +3,7 @@ import { supabase } from "./lib/supabase";
 
 const PORTAL_URL = "https://integra.ploffshore.com";
 const ERP_HOME_URL = "https://integra.ploffshore.com";
-const BUQUES = ["Atlantic Dama", "Golondrina de Mar"];
+const BUQUES = ["Atlantic Dama", "Golondrina de Mar", "Oficina/Astillero"];
 const SECCIONES_ESTAT = ["GENERAL", "MARPOL", "INSURANCE", "OTHER"];
 const SECCIONES_NOESTAT = ["FFA", "EQUIPO SALVAMENTO", "EQUIPO DE CARGAMENTO Y CUBIERTA", "PUENTE", "MAQUINAS", "AMARRE", "OTROS"];
 const SECCION_LABEL = {
@@ -1442,8 +1442,10 @@ export default function App() {
     "ad-equipo":  { titulo: "Atlantic Dama · Equipos",      sub: "Certificados de equipos y elementos de seguridad, con subvencimientos." },
     "gdm-estat":  { titulo: "Golondrina de Mar · Estatutarios", sub: "Certificados estatutarios del buque, con su emisor y fecha de vencimiento." },
     "gdm-equipo": { titulo: "Golondrina de Mar · Equipos",      sub: "Certificados de equipos y elementos de seguridad, con subvencimientos." },
+    "ofast-estat":  { titulo: "Oficina/Astillero · Estatutarios", sub: "Certificados estatutarios de oficina y astillero, con su emisor y fecha de vencimiento." },
+    "ofast-equipo": { titulo: "Oficina/Astillero · Equipos",      sub: "Certificados de equipos y elementos de seguridad de oficina y astillero, con subvencimientos." },
   };
-  const pageConfig = { "ad-estat": { buque: "Atlantic Dama", tipo: "estatutario" }, "ad-equipo": { buque: "Atlantic Dama", tipo: "no_estatutario" }, "gdm-estat": { buque: "Golondrina de Mar", tipo: "estatutario" }, "gdm-equipo": { buque: "Golondrina de Mar", tipo: "no_estatutario" } };
+  const pageConfig = { "ad-estat": { buque: "Atlantic Dama", tipo: "estatutario" }, "ad-equipo": { buque: "Atlantic Dama", tipo: "no_estatutario" }, "gdm-estat": { buque: "Golondrina de Mar", tipo: "estatutario" }, "gdm-equipo": { buque: "Golondrina de Mar", tipo: "no_estatutario" }, "ofast-estat": { buque: "Oficina/Astillero", tipo: "estatutario" }, "ofast-equipo": { buque: "Oficina/Astillero", tipo: "no_estatutario" } };
 
   const NAV = [
     { titulo: "General", items: [
@@ -1456,6 +1458,10 @@ export default function App() {
     { titulo: "Golondrina de Mar", items: [
       { id: "gdm-estat",  icon: "file", label: "Estatutarios", count: 0 },
       { id: "gdm-equipo", icon: "gear", label: "Equipos",      count: 0 },
+    ]},
+    { titulo: "Oficina/Astillero", items: [
+      { id: "ofast-estat",  icon: "file", label: "Estatutarios", count: 0 },
+      { id: "ofast-equipo", icon: "gear", label: "Equipos",      count: 0 },
     ]},
   ];
 

@@ -223,6 +223,7 @@ tr.click:hover td{background:var(--surface2);cursor:pointer}
 .b-orange{background:#FBF1E3;color:#8F5A0B;border:0}
 .b-green{background:#E8F3EF;color:#0E7A5F;border:0}
 .b-gray{background:#F4F6F8;color:#4A5560;border:0}
+.b-navy{background:#E6ECF2;color:#082F4E;border:0}
 .urgdot{width:6px;height:6px;border-radius:50%;display:inline-block;margin-right:6px;flex-shrink:0}
 
 /*  BOTONES · un solo primario por vista. Nada se mueve al presionar  */
@@ -495,6 +496,34 @@ tr.click:hover td{background:var(--surface2);cursor:pointer}
 @media(max-width:768px){
   .desktop-table{display:none}
   .mobile-cards{display:block}
+}
+
+/*  FILA DE ALERTA · el estado va en el borde izquierdo de 3px  */
+.alert-row{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--border2);border-radius:var(--r);padding:14px 16px;margin-bottom:10px;cursor:pointer;transition:var(--tr)}
+.alert-row:hover{border-color:var(--navy)}
+.alert-row.vencido{border-left-color:var(--danger)}
+.alert-row.critico{border-left-color:var(--warn)}
+
+/*  SECCION VENCIDOS  */
+.venc-card{background:var(--surface);border:1px solid var(--border);border-left:3px solid var(--danger);border-radius:var(--r);padding:18px 20px}
+.venc-card.ok{border-left-color:var(--accent2)}
+.venc-header{display:flex;align-items:center;gap:10px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--border)}
+.venc-header-title{font-family:var(--mono);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--danger)}
+.venc-buque-title{display:flex;align-items:center;gap:10px;font-family:var(--sans);font-size:14px;font-weight:600;color:var(--navy);margin:18px 0 10px}
+.venc-card > div:first-of-type .venc-buque-title,.venc-header + div .venc-buque-title{margin-top:0}
+
+/*  MODAL DE IMPRESION (vista previa)  */
+.btn-print{background:var(--surface);color:var(--navy);border-color:var(--border2)}
+.btn-print:hover{background:var(--surface2)}
+.print-overlay{position:fixed;inset:0;background:rgba(15,20,25,.45);display:flex;align-items:flex-start;justify-content:center;z-index:200;padding:24px;overflow-y:auto}
+.print-modal{background:var(--surface);border-radius:var(--r);width:100%;max-width:900px;margin:auto;box-shadow:0 8px 24px rgba(15,20,25,.14);overflow:hidden}
+.print-modal-bar{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 20px;background:var(--navy);color:#fff}
+.print-body{padding:28px 32px;max-height:calc(100vh - 160px);overflow-y:auto;background:#fff}
+@media print{.no-print{display:none !important}}
+@media(max-width:768px){
+  .print-overlay{padding:0}
+  .print-modal{max-width:100%;border-radius:0;min-height:100vh}
+  .print-body{padding:16px}
 }
 
 `;
@@ -890,12 +919,20 @@ function PrintModal({ buque, tipo, certs, subvencimientos, onClose }) {
     const el = document.getElementById("print-content-area");
     if (!el) return;
     const win = window.open("", "_blank", "width=900,height=700");
+    if (!win) { alert("El navegador bloqueó la ventana de impresión. Habilitá las ventanas emergentes para este sitio y volvé a intentar."); return; }
+    const origin = window.location.origin;
     win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8">
+      <base href="${origin}/">
       <title>${buque} — ${tipoLabel}</title>
       <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+        /* Las variables se copian aca porque el contenido usa estilos inline con var(--...) */
+        :root{--navy:#002247;--blue:#002247;--mid:#4A5560;--muted:#4A5560;--muted2:#7A8792;
+          --accent:#002247;--accent2:#0E7A5F;--warn:#8F5A0B;--danger:#B3261E;
+          --border:#E4E8EC;--border2:#C9D0D6;--surface:#FFFFFF;--surface2:#F4F6F8;
+          --mono:'DM Mono',monospace;--sans:'Montserrat',sans-serif;--r:4px}
         *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'Montserrat',sans-serif;font-size:12px;color:#213363;padding:28px 32px;background:#fff}
+        body{font-family:'Montserrat',sans-serif;font-size:12px;color:#213363;padding:28px 32px;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
         @page{size:A4;margin:14mm 12mm}
         table{width:100%;border-collapse:collapse;font-size:10px}
         th{font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#6381A7;padding:5px 8px;text-align:left;border-bottom:1.5px solid #D6E0ED;background:#F5F7FA;white-space:nowrap}
@@ -907,7 +944,10 @@ function PrintModal({ buque, tipo, certs, subvencimientos, onClose }) {
       </style>
     </head><body>${el.innerHTML}</body></html>`);
     win.document.close(); win.focus();
-    setTimeout(() => { win.print(); }, 400);
+    // Espera a que las fuentes/imagenes carguen antes de imprimir
+    const lanzar = () => setTimeout(() => win.print(), 300);
+    if (win.document.readyState === "complete") lanzar();
+    else win.onload = lanzar;
   };
   return (
     <div className="print-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -1164,6 +1204,31 @@ function PageTabla({ certs, buque, tipo, subvencimientos, onSelect, onNuevo, onS
   );
 }
 
+//  FILA DE ALERTA (reutilizable) 
+function AlertRow({ item, onSelect, style }) {
+  const { tipo_item, fechaRef, cert: c, sv } = item;
+  const esSubvenc = tipo_item === "subvenc";
+  const d = diasHasta(fechaRef);
+  const alertCls = d === null ? "" : d < 0 ? "vencido" : d <= 60 ? "critico" : "";
+  return (
+    <div className={`alert-row ${alertCls}`} style={{ ...(esSubvenc ? { marginLeft: 24, borderLeftStyle: "dashed" } : {}), ...(style || {}) }} onClick={() => onSelect(c)}>
+      <div className="flex-gap mb8">
+        <span className="badge b-navy">{c.buque}</span>
+        <span className="badge b-gray">{SECCION_LABEL[c.seccion] || c.seccion}</span>
+        <span className="badge b-blue">{c.tipo === "estatutario" ? "Estat." : "Equipo"}</span>
+        {esSubvenc && <span className="badge b-teal">Verificación</span>}
+        <span style={{ marginLeft: "auto" }}><DiasChip fechaStr={fechaRef} /></span>
+      </div>
+      {esSubvenc
+        ? <div style={{ fontWeight: 600, fontSize: 13, color: "var(--navy)" }}><span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 400 }}>↳ {c.descripcion} · </span>{sv.descripcion}</div>
+        : <div style={{ fontWeight: 600, fontSize: 13, color: "var(--navy)" }}>{c.descripcion}</div>}
+      {esSubvenc
+        ? <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>Ventana: {sv.fecha_desde ? fmtDate(sv.fecha_desde) : "—"} → {fmtDate(sv.fecha_hasta)}{sv.observaciones && <span style={{ marginLeft: 8 }}>· {sv.observaciones}</span>}</div>
+        : <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>{c.tipo === "estatutario" ? `Vence: ${fmtDate(c.fecha_vencimiento)}${c.emitido_por ? ` · ${c.emitido_por}` : ""}` : `Próx. servicio: ${fmtDate(c.fecha_proximo_servicio)}${c.proveedor ? ` · ${c.proveedor}` : ""}`}</div>}
+    </div>
+  );
+}
+
 //  PAGE ALERTAS 
 function PageAlertas({ certs, subvencimientos, onSelect }) {
   const hoy = fechaHoy(); const def90 = fechaDefault90();
@@ -1186,7 +1251,23 @@ function PageAlertas({ certs, subvencimientos, onSelect }) {
     });
   });
   itemsEnRango.sort((a, b) => a.fechaRef.localeCompare(b.fechaRef));
-  const getAlertClass = f => { const d = diasHasta(f); if (d === null) return ""; if (d < 0) return "vencido"; if (d <= 60) return "critico"; return ""; };
+
+  //  Vencidos (siempre visibles, agrupados por buque). Respeta el filtro de buque, ignora el rango de fechas.
+  const itemsVencidos = [];
+  certs.filter(c => !filtroBuque || c.buque === filtroBuque).forEach(c => {
+    const f = getFechaRef(c);
+    const d = diasHasta(f);
+    if (d !== null && d < 0) itemsVencidos.push({ tipo_item: "cert", fechaRef: f, cert: c, sv: null });
+    subvencimientos.filter(s => s.certificado_id === c.id).forEach(s => {
+      const dSv = diasHasta(s.fecha_hasta);
+      if (dSv !== null && dSv < 0) itemsVencidos.push({ tipo_item: "subvenc", fechaRef: s.fecha_hasta, cert: c, sv: s });
+    });
+  });
+  const vencidosPorBuque = {};
+  itemsVencidos.forEach(it => { (vencidosPorBuque[it.cert.buque] = vencidosPorBuque[it.cert.buque] || []).push(it); });
+  Object.values(vencidosPorBuque).forEach(arr => arr.sort((a, b) => a.fechaRef.localeCompare(b.fechaRef)));
+  const buquesVencidos = BUQUES.filter(b => (vencidosPorBuque[b] || []).length > 0);
+
 
   return (
     <div>
@@ -1218,36 +1299,40 @@ function PageAlertas({ certs, subvencimientos, onSelect }) {
         </div>
       </div>
 
+      {/*  SECCIÓN VENCIDOS · siempre visible, agrupada por buque  */}
+      {itemsVencidos.length === 0
+        ? <div className="venc-card ok mb12" style={{ borderLeftColor: "var(--accent2)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "var(--accent2)" }}>
+              <span>✓ Sin certificados vencidos{filtroBuque ? ` en ${filtroBuque}` : ""}</span>
+            </div>
+          </div>
+        : <div className="venc-card mb12">
+            <div className="venc-header">
+              <span className="venc-header-title">Certificados vencidos</span>
+              <span className="badge b-red">{itemsVencidos.length} en total</span>
+            </div>
+            {buquesVencidos.map(b => (
+              <div key={b}>
+                <div className="venc-buque-title">
+                  <span>Vencidos {b}</span>
+                  <span className="badge b-red">{vencidosPorBuque[b].length}</span>
+                </div>
+                {vencidosPorBuque[b].map((item, idx) => (
+                  <AlertRow key={`venc-${item.tipo_item === "subvenc" ? "sv" + item.sv.id : "c" + item.cert.id}-${idx}`} item={item} onSelect={onSelect} />
+                ))}
+              </div>
+            ))}
+          </div>
+      }
+
+      {/*  SECCIÓN RANGO (a futuro)  */}
       {itemsEnRango.length === 0
         ? <div className="empty-state"><div style={{ fontSize: 32, marginBottom: 8 }}></div>Sin vencimientos en el período</div>
         : <div>
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: "var(--muted)", textTransform: "uppercase", marginBottom: 10 }}>{itemsEnRango.length} vencimientos en el período</div>
-          {itemsEnRango.map((item, idx) => {
-            const { tipo_item, fechaRef, cert: c, sv } = item;
-            const alertCls = getAlertClass(fechaRef); const esSubvenc = tipo_item === "subvenc";
-            return (
-              <div key={`${esSubvenc ? "sv" : "c"}-${esSubvenc ? sv.id : c.id}-${idx}`} className={`alert-row ${alertCls}`} style={esSubvenc ? { marginLeft: 24, borderLeftStyle: "dashed" } : {}} onClick={() => onSelect(c)}>
-                {/* [DS-10.2] Nivel 1: identificadores */}
-                <div className="flex-gap mb8">
-                  <span className="badge b-navy">{c.buque}</span>
-                  <span className="badge b-gray">{SECCION_LABEL[c.seccion] || c.seccion}</span>
-                  <span className="badge b-blue">{c.tipo === "estatutario" ? "Estat." : "Equipo"}</span>
-                  {esSubvenc && <span className="badge b-teal">Verificación</span>}
-                  <span style={{ marginLeft: "auto" }}><DiasChip fechaStr={fechaRef} /></span>
-                </div>
-                {/* [DS-10.2] Nivel 2: título */}
-                {esSubvenc
-                  ? <div style={{ fontWeight: 600, fontSize: 13, color: "var(--navy)" }}><span style={{ fontSize: 10, color: "var(--muted)", fontWeight: 400 }}>↳ {c.descripcion} · </span>{sv.descripcion}</div>
-                  : <div style={{ fontWeight: 600, fontSize: 13, color: "var(--navy)" }}>{c.descripcion}</div>
-                }
-                {/* [DS-10.2] Nivel 3: metadata */}
-                {esSubvenc
-                  ? <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>Ventana: {sv.fecha_desde ? fmtDate(sv.fecha_desde) : "—"} → {fmtDate(sv.fecha_hasta)}{sv.observaciones && <span style={{ marginLeft: 8 }}>· {sv.observaciones}</span>}</div>
-                  : <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>{c.tipo === "estatutario" ? `Vence: ${fmtDate(c.fecha_vencimiento)}${c.emitido_por ? ` · ${c.emitido_por}` : ""}` : `Próx. servicio: ${fmtDate(c.fecha_proximo_servicio)}${c.proveedor ? ` · ${c.proveedor}` : ""}`}</div>
-                }
-              </div>
-            );
-          })}
+          {itemsEnRango.map((item, idx) => (
+            <AlertRow key={`${item.tipo_item === "subvenc" ? "sv" + item.sv.id : "c" + item.cert.id}-${idx}`} item={item} onSelect={onSelect} />
+          ))}
         </div>
       }
     </div>

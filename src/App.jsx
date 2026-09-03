@@ -795,7 +795,7 @@ function ModalCert({ cert, responsables = [], onClose, onSave, notify }) {
     fecha_emision: cert.fecha_emision || "", fecha_vencimiento: cert.fecha_vencimiento || "",
     fecha_ultimo_servicio: cert.fecha_ultimo_servicio || "", fecha_proximo_servicio: cert.fecha_proximo_servicio || "",
     observaciones: cert.observaciones || "", documento_url: cert.documento_url || "", documento_nombre: cert.documento_nombre || "",
-    requiere_solicitud: cert.requiere_solicitud || false, nro_solicitud: cert.nro_solicitud || "", responsable_final: cert.responsable_final || "",
+    responsable_final: cert.responsable_final || "",
   });
   const [saving, setSaving] = useState(false); const [uploading, setUploading] = useState(false);
   const set = (k, v) => setForm(f => ({ ...f, [k]: v }));
@@ -811,7 +811,7 @@ function ModalCert({ cert, responsables = [], onClose, onSave, notify }) {
     setSaving(true);
     try {
       const fechaRef = esEstat ? form.fecha_vencimiento : form.fecha_proximo_servicio;
-      const payload = { buque: form.buque, tipo: form.tipo, seccion: form.seccion, descripcion: form.descripcion, nro_certificado: form.nro_certificado || null, emitido_por: form.emitido_por || null, nro_serie: form.nro_serie || null, proveedor: form.proveedor || null, fecha_emision: form.fecha_emision || null, fecha_vencimiento: form.fecha_vencimiento || null, fecha_ultimo_servicio: form.fecha_ultimo_servicio || null, fecha_proximo_servicio: form.fecha_proximo_servicio || null, observaciones: form.observaciones || null, documento_url: form.documento_url || null, documento_nombre: form.documento_nombre || null, requiere_solicitud: form.requiere_solicitud, nro_solicitud: form.requiere_solicitud ? (form.nro_solicitud || null) : null, responsable_final: form.responsable_final || null, dias_vencimiento: diasHasta(fechaRef), activo: true };
+      const payload = { buque: form.buque, tipo: form.tipo, seccion: form.seccion, descripcion: form.descripcion, nro_certificado: form.nro_certificado || null, emitido_por: form.emitido_por || null, nro_serie: form.nro_serie || null, proveedor: form.proveedor || null, fecha_emision: form.fecha_emision || null, fecha_vencimiento: form.fecha_vencimiento || null, fecha_ultimo_servicio: form.fecha_ultimo_servicio || null, fecha_proximo_servicio: form.fecha_proximo_servicio || null, observaciones: form.observaciones || null, documento_url: form.documento_url || null, documento_nombre: form.documento_nombre || null, responsable_final: form.responsable_final || null, dias_vencimiento: diasHasta(fechaRef), activo: true };
       const saved = cert.id ? await api.updateCertificado(cert.id, payload) : await api.insertCertificado(payload);
       notify(esNuevo ? "Certificado creado" : "Actualizado", "success"); onSave(saved);
     } catch (e) { notify("Error: " + e.message, "error"); } finally { setSaving(false); }
@@ -838,17 +838,6 @@ function ModalCert({ cert, responsables = [], onClose, onSave, notify }) {
           }
           <FG label="Observaciones" full><textarea value={form.observaciones} onChange={e => set("observaciones", e.target.value)} placeholder="Notas..." /></FG>
           <div className="form-section">Gestión</div>
-          <div className="form-grid">
-            <FG label="¿Requiere solicitud de provisión / servicio?">
-              <select value={form.requiere_solicitud ? "si" : "no"} onChange={e => { const si = e.target.value === "si"; set("requiere_solicitud", si); if (!si) set("nro_solicitud", ""); }}>
-                <option value="no">No</option>
-                <option value="si">Sí</option>
-              </select>
-            </FG>
-            <FG label="N° de solicitud" hint={form.requiere_solicitud ? "" : "Se habilita al marcar “Sí”"}>
-              <input value={form.nro_solicitud} onChange={e => set("nro_solicitud", e.target.value)} disabled={!form.requiere_solicitud} placeholder={form.requiere_solicitud ? "Ej: SOL-2026-014" : "—"} />
-            </FG>
-          </div>
           <FG label="Responsable final" full hint={responsables.length === 0 ? "El catálogo de responsables está vacío. El administrador puede cargarlo en Catálogos." : ""}>
             <select value={form.responsable_final} onChange={e => set("responsable_final", e.target.value)}>
               <option value="">— Sin asignar —</option>
@@ -925,12 +914,6 @@ function ModalVerCert({ cert, subvencimientos, onClose, onEdit, onDelete, notify
                 </div>
               </>}
               {cert.nro_serie && <div className="info-box"><div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>N° Serie</div>{cert.nro_serie}</div>}
-              <div className="info-box">
-                <div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>Solicitud provisión / servicio</div>
-                {cert.requiere_solicitud
-                  ? <span><span className="badge b-amber" style={{ marginRight: 6 }}>Requiere</span>{cert.nro_solicitud ? <span className="text-mono">N° {cert.nro_solicitud}</span> : <span style={{ color: "var(--muted2)" }}>sin N° cargado</span>}</span>
-                  : <span style={{ color: "var(--muted)" }}>No requiere</span>}
-              </div>
               <div className="info-box"><div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>Responsable final</div>{cert.responsable_final || "—"}</div>
             </div>
             {cert.observaciones && <div className="info-box mt8" style={{ fontSize: 12 }}><strong>Obs:</strong> {cert.observaciones}</div>}
@@ -1043,6 +1026,7 @@ function PrintModal({ buque, tipo, certs, subvencimientos, onClose }) {
                       <th>{tipo === "estatutario" ? "Emisión" : "Últ. servicio"}</th>
                       <th>{tipo === "estatutario" ? "Vencimiento" : "Próx. servicio"}</th>
                       <th>Estado</th>
+                      <th>Responsable</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -1062,6 +1046,7 @@ function PrintModal({ buque, tipo, certs, subvencimientos, onClose }) {
                             <td style={{ fontFamily: "var(--mono)", fontSize: 9 }}>{tipo === "estatutario" ? fmtDate(c.fecha_emision) : fmtDate(c.fecha_ultimo_servicio)}</td>
                             <td style={{ fontFamily: "var(--mono)", fontSize: 9, fontWeight: 700, color: col }}>{tipo === "estatutario" ? fmtDate(c.fecha_vencimiento) : fmtDate(c.fecha_proximo_servicio)}</td>
                             <td><PrintChip fechaStr={fechaRef} /></td>
+                            <td style={{ fontSize: 9, color: "var(--muted)" }}>{c.responsable_final || "—"}</td>
                           </tr>
                           {svDeCert.map((s, si) => (
                             <tr key={s.id} className="psv-row">
@@ -1069,6 +1054,7 @@ function PrintModal({ buque, tipo, certs, subvencimientos, onClose }) {
                               <td colSpan={4}><span style={{ color: "#4ADE80", fontWeight: 700, marginRight: 4 }}>↳</span><span style={{ fontWeight: 500 }}>{s.descripcion}</span>{s.observaciones && <span style={{ color: "#888", marginLeft: 6 }}>· {s.observaciones}</span>}</td>
                               <td style={{ fontFamily: "var(--mono)", fontSize: 9 }}>{s.fecha_desde && s.fecha_hasta ? `${fmtDate(s.fecha_desde)} → ${fmtDate(s.fecha_hasta)}` : s.fecha_hasta ? fmtDate(s.fecha_hasta) : "—"}</td>
                               <td>{s.fecha_hasta ? <PrintChip fechaStr={s.fecha_hasta} /> : "—"}</td>
+                              <td></td>
                             </tr>
                           ))}
                         </>
@@ -1177,7 +1163,7 @@ function PageTabla({ certs, buque, tipo, subvencimientos, onSelect, onNuevo, onS
                     {tipo === "estatutario"
                       ? <><th>N°</th><th>Emisor</th><th>Emisión</th><th>Vencimiento</th></>
                       : <><th>N°</th><th>Proveedor</th><th>Últ. serv.</th><th>Próx. serv.</th></>}
-                    <th>Estado</th><th>Solicitud</th><th>Responsable</th><th>Doc.</th>
+                    <th>Estado</th><th>Responsable</th><th>Doc.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1207,19 +1193,12 @@ function PageTabla({ certs, buque, tipo, subvencimientos, onSelect, onNuevo, onS
                             {tipo === "estatutario" ? fmtDate(c.fecha_vencimiento) : fmtDate(c.fecha_proximo_servicio)}
                           </td>
                           <td><DiasChip fechaStr={fechaRef} /></td>
-                          <td style={{ fontSize: 11 }}>
-                            {c.requiere_solicitud
-                              ? (c.nro_solicitud
-                                  ? <span className="text-mono" style={{ color: "var(--navy)" }}>{c.nro_solicitud}</span>
-                                  : <span className="badge b-amber">Sí · s/n°</span>)
-                              : <span style={{ color: "var(--muted2)" }}>No</span>}
-                          </td>
                           <td className="col-ell" style={{ fontSize: 11, color: c.responsable_final ? "var(--text)" : "var(--muted2)" }} title={c.responsable_final || ""}>{c.responsable_final || "—"}</td>
                           <td style={{ textAlign: "center" }}>{c.documento_url ? <a href={c.documento_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 14, color: "var(--blue)" }}></a> : <span style={{ color: "var(--muted2)", fontSize: 11 }}>—</span>}</td>
                         </tr>
                         {tipo === "estatutario" && (
                           <tr key={`sv-${c.id}`}>
-                            <td colSpan={11} style={{ padding: 0, paddingLeft: 44, paddingRight: 12, background: rowBg }}>
+                            <td colSpan={10} style={{ padding: 0, paddingLeft: 44, paddingRight: 12, background: rowBg }}>
                               <SubvencimientosBloque cert={c} subvencimientos={subvencimientos} onAdd={() => setModalSv({ certId: c.id, sv: null })} onEdit={sv => setModalSv({ certId: c.id, sv })} onDelete={handleDeleteSv} />
                             </td>
                           </tr>
@@ -1246,7 +1225,7 @@ function PageTabla({ certs, buque, tipo, subvencimientos, onSelect, onNuevo, onS
                     </div>
                     <div className="mobile-card-meta">{tipo === "estatutario" ? `Vence: ${fmtDate(c.fecha_vencimiento)}` : `Próx. servicio: ${fmtDate(c.fecha_proximo_servicio)}`}{c.documento_url && <span style={{ marginLeft: 8, color: "var(--blue)" }}></span>}</div>
                     <div className="mobile-card-meta" style={{ marginTop: 2 }}>
-                      Solicitud: {c.requiere_solicitud ? (c.nro_solicitud ? c.nro_solicitud : "Sí (s/n°)") : "No"} · Resp.: {c.responsable_final || "—"}
+                      Resp.: {c.responsable_final || "—"}
                     </div>
                     {svDeCert.length > 0 && (
                       <div className="mobile-card-sv">

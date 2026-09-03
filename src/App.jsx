@@ -982,7 +982,7 @@ function PrintModal({ buque, tipo, certs, subvencimientos, onClose }) {
         <div className="print-modal-bar">
           <div><div style={{ fontWeight: 700, fontSize: 14 }}>Vista previa · {buque}</div><div style={{ fontSize: 11, opacity: .7, marginTop: 2 }}>{tipoLabel}</div></div>
           <div style={{ display: "flex", gap: 8 }}>
-            <button className="btn btn-ghost btn-sm" style={{ color: "#fff", borderColor: "rgba(255,255,255,.3)" }} onClick={onClose}>✕ Cerrar</button>
+            <button className="btn btn-sm" style={{ background: "rgba(255,255,255,.12)", color: "#fff", border: "1px solid rgba(255,255,255,.4)" }} onClick={onClose}>✕ Cerrar</button>
             <button className="btn btn-sm" style={{ background: "#fff", color: "var(--navy)" }} onClick={handlePrint}> Imprimir / Guardar PDF</button>
           </div>
         </div>

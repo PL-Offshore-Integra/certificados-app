@@ -125,6 +125,26 @@ const api = {
     const promises = updates.map(u => supabase.from("certificados").update({ orden: u.orden }).eq("id", u.id));
     await Promise.all(promises);
   },
+  //  CATÁLOGO DE RESPONSABLES 
+  async getResponsables() {
+    const { data, error } = await supabase.from("catalogo_responsables").select("*").order("nombre");
+    if (error) throw error;
+    return data || [];
+  },
+  async insertResponsable(nombre) {
+    const { data, error } = await supabase.from("catalogo_responsables").insert([{ nombre }]).select().single();
+    if (error) throw error;
+    return data;
+  },
+  async updateResponsable(id, cambios) {
+    const { data, error } = await supabase.from("catalogo_responsables").update(cambios).eq("id", id).select().single();
+    if (error) throw error;
+    return data;
+  },
+  async deleteResponsable(id) {
+    const { error } = await supabase.from("catalogo_responsables").delete().eq("id", id);
+    if (error) throw error;
+  },
 };
 
 //  CSS 
@@ -766,7 +786,7 @@ function SubvencimientosBloque({ cert, subvencimientos, onAdd, onEdit, onDelete 
 }
 
 //  MODAL EDITAR/CREAR CERT 
-function ModalCert({ cert, onClose, onSave, notify }) {
+function ModalCert({ cert, responsables = [], onClose, onSave, notify }) {
   const esNuevo = !cert.id; const fileRef = useRef();
   const [form, setForm] = useState({
     buque: cert.buque || "Atlantic Dama", tipo: cert.tipo || "estatutario", seccion: cert.seccion || "GENERAL",
@@ -829,7 +849,13 @@ function ModalCert({ cert, onClose, onSave, notify }) {
               <input value={form.nro_solicitud} onChange={e => set("nro_solicitud", e.target.value)} disabled={!form.requiere_solicitud} placeholder={form.requiere_solicitud ? "Ej: SOL-2026-014" : "—"} />
             </FG>
           </div>
-          <FG label="Responsable final" full><input value={form.responsable_final} onChange={e => set("responsable_final", e.target.value)} placeholder="Nombre del responsable..." /></FG>
+          <FG label="Responsable final" full hint={responsables.length === 0 ? "El catálogo de responsables está vacío. El administrador puede cargarlo en Catálogos." : ""}>
+            <select value={form.responsable_final} onChange={e => set("responsable_final", e.target.value)}>
+              <option value="">— Sin asignar —</option>
+              {responsables.map(r => <option key={r} value={r}>{r}</option>)}
+              {form.responsable_final && !responsables.includes(form.responsable_final) && <option value={form.responsable_final}>{form.responsable_final} (fuera de catálogo)</option>}
+            </select>
+          </FG>
           <div className="mt16">
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: .5, textTransform: "uppercase", color: "var(--navy)", marginBottom: 8 }}>Documento adjunto</div>
             <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: "none" }} onChange={e => handleUpload(e.target.files[0])} />
@@ -1242,6 +1268,91 @@ function PageTabla({ certs, buque, tipo, subvencimientos, onSelect, onNuevo, onS
   );
 }
 
+//  PAGE CATÁLOGOS (solo admin) 
+function PageCatalogos({ responsables, onChange, notify }) {
+  const [nuevo, setNuevo] = useState("");
+  const [editId, setEditId] = useState(null);
+  const [editVal, setEditVal] = useState("");
+  const [busy, setBusy] = useState(false);
+  const lista = [...responsables].sort((a, b) => (a.nombre || "").localeCompare(b.nombre || ""));
+
+  const agregar = async () => {
+    const n = nuevo.trim();
+    if (!n) return;
+    if (responsables.some(r => (r.nombre || "").toLowerCase() === n.toLowerCase())) { notify("Ese responsable ya existe en el catálogo", "error"); return; }
+    setBusy(true);
+    try { await api.insertResponsable(n); setNuevo(""); notify("Responsable agregado", "success"); await onChange(); }
+    catch (e) { notify("Error al agregar: " + e.message, "error"); } finally { setBusy(false); }
+  };
+  const guardarEdit = async id => {
+    const n = editVal.trim();
+    if (!n) { setEditId(null); return; }
+    setBusy(true);
+    try { await api.updateResponsable(id, { nombre: n }); setEditId(null); notify("Actualizado", "success"); await onChange(); }
+    catch (e) { notify("Error al actualizar: " + e.message, "error"); } finally { setBusy(false); }
+  };
+  const toggleActivo = async r => {
+    setBusy(true);
+    try { await api.updateResponsable(r.id, { activo: !(r.activo !== false) }); await onChange(); }
+    catch (e) { notify("Error: " + e.message, "error"); } finally { setBusy(false); }
+  };
+  const eliminar = async r => {
+    if (!window.confirm(`¿Eliminar "${r.nombre}" del catálogo?\n\nLos certificados que ya lo tengan asignado conservan el nombre, pero dejará de estar disponible para nuevas asignaciones. Si preferís conservar el histórico, usá "Desactivar" en lugar de eliminar.`)) return;
+    setBusy(true);
+    try { await api.deleteResponsable(r.id); notify("Eliminado del catálogo", "success"); await onChange(); }
+    catch (e) { notify("Error al eliminar: " + e.message, "error"); } finally { setBusy(false); }
+  };
+
+  return (
+    <div>
+      <div className="card mb12">
+        <div className="card-title">Responsables</div>
+        <p style={{ fontSize: 12, color: "var(--muted)", margin: "4px 0 12px" }}>Estos nombres son los que aparecen en el selector <strong>“Responsable final”</strong> de cada certificado y en el filtro del panel de alertas.</p>
+        <div className="flex-gap">
+          <input className="filter-input" style={{ flex: 1 }} placeholder="Nombre del responsable…" value={nuevo} onChange={e => setNuevo(e.target.value)} onKeyDown={e => e.key === "Enter" && agregar()} />
+          <button className="btn btn-primary btn-sm" onClick={agregar} disabled={busy || !nuevo.trim()}>+ Agregar</button>
+        </div>
+      </div>
+
+      {lista.length === 0
+        ? <div className="empty-state">El catálogo de responsables está vacío. Agregá el primero arriba.</div>
+        : <div className="card" style={{ padding: 0, overflow: "hidden" }}>
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Nombre</th><th style={{ width: 90 }}>Estado</th><th style={{ width: 220 }}>Acciones</th></tr></thead>
+                <tbody>
+                  {lista.map(r => {
+                    const activo = r.activo !== false;
+                    return (
+                      <tr key={r.id}>
+                        <td style={{ fontWeight: 500 }}>
+                          {editId === r.id
+                            ? <input className="filter-input" style={{ width: "100%" }} value={editVal} autoFocus onChange={e => setEditVal(e.target.value)} onKeyDown={e => { if (e.key === "Enter") guardarEdit(r.id); if (e.key === "Escape") setEditId(null); }} />
+                            : r.nombre}
+                        </td>
+                        <td>{activo ? <span className="badge b-teal">Activo</span> : <span className="badge b-gray">Inactivo</span>}</td>
+                        <td>
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            {editId === r.id
+                              ? <><button className="btn btn-primary btn-sm" onClick={() => guardarEdit(r.id)} disabled={busy}>Guardar</button>
+                                  <button className="btn btn-ghost btn-sm" onClick={() => setEditId(null)}>Cancelar</button></>
+                              : <><button className="btn btn-ghost btn-sm" onClick={() => { setEditId(r.id); setEditVal(r.nombre); }}>Editar</button>
+                                  <button className="btn btn-ghost btn-sm" onClick={() => toggleActivo(r)} disabled={busy}>{activo ? "Desactivar" : "Activar"}</button>
+                                  <button className="btn btn-ghost btn-sm" style={{ color: "var(--danger)" }} onClick={() => eliminar(r)} disabled={busy}>Eliminar</button></>}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+      }
+    </div>
+  );
+}
+
 //  FILA DE ALERTA (reutilizable) 
 function AlertRow({ item, onSelect, style }) {
   const { tipo_item, fechaRef, cert: c, sv } = item;
@@ -1268,15 +1379,16 @@ function AlertRow({ item, onSelect, style }) {
 }
 
 //  PAGE ALERTAS 
-function PageAlertas({ certs, subvencimientos, onSelect }) {
+function PageAlertas({ certs, subvencimientos, responsables = [], onSelect }) {
   const hoy = fechaHoy(); const def90 = fechaDefault90();
   const [desde, setDesde] = useState(hoy);
   const [hasta, setHasta] = useState(def90);
   const [filtroBuque, setFiltroBuque] = useState("");
   const [filtroResp, setFiltroResp] = useState("");
 
-  // Lista única de responsables cargados (para el selector)
-  const responsables = [...new Set(certs.map(c => (c.responsable_final || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  // Opciones del filtro: catálogo + cualquier responsable ya cargado en certs (legacy)
+  const respEnCerts = certs.map(c => (c.responsable_final || "").trim()).filter(Boolean);
+  const opcionesResp = [...new Set([...responsables, ...respEnCerts])].sort((a, b) => a.localeCompare(b));
 
   const getFechaRef = c => c.tipo === "estatutario" ? c.fecha_vencimiento : c.fecha_proximo_servicio;
   const vencidos = certs.filter(c => { const d = diasHasta(getFechaRef(c)); return d !== null && d < 0; });
@@ -1325,7 +1437,7 @@ function PageAlertas({ certs, subvencimientos, onSelect }) {
         {/* [H15][DS-11.6] clase form-grid-3 en lugar de gridTemplateColumns inline */}
         <div className="form-grid-4">
           <FG label="Barco"><select value={filtroBuque} onChange={e => setFiltroBuque(e.target.value)}><option value="">Todos</option>{BUQUES.map(b => <option key={b}>{b}</option>)}</select></FG>
-          <FG label="Responsable"><select value={filtroResp} onChange={e => setFiltroResp(e.target.value)}><option value="">Todos</option>{responsables.map(r => <option key={r}>{r}</option>)}</select></FG>
+          <FG label="Responsable"><select value={filtroResp} onChange={e => setFiltroResp(e.target.value)}><option value="">Todos</option>{opcionesResp.map(r => <option key={r}>{r}</option>)}</select></FG>
           <FG label="Desde"><input type="date" value={desde} onChange={e => setDesde(e.target.value)} /></FG>
           <FG label="Hasta"><input type="date" value={hasta} onChange={e => setHasta(e.target.value)} /></FG>
         </div>
@@ -1390,6 +1502,7 @@ export default function App() {
   const [page, setPage] = useState("alertas");
   const [certs, setCerts] = useState([]);
   const [subvencimientos, setSubvencimientos] = useState([]);
+  const [responsables, setResponsables] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notif, setNotif] = useState(null);
   const [selected, setSelected] = useState(null);
@@ -1417,7 +1530,12 @@ export default function App() {
     try { setSubvencimientos(await api.getAllSubvencimientos()); } catch (e) { notify("Error: " + e.message, "error"); }
   }, [notify]);
 
-  useEffect(() => { if (session) loadCerts(); }, [session, loadCerts]);
+  const loadResponsables = useCallback(async () => {
+    // Carga aparte y tolerante a fallos: si la tabla del catálogo aún no existe, la app sigue funcionando.
+    try { setResponsables(await api.getResponsables()); } catch (e) { setResponsables([]); }
+  }, []);
+
+  useEffect(() => { if (session) { loadCerts(); loadResponsables(); } }, [session, loadCerts, loadResponsables]);
 
   const getFechaRef = c => c.tipo === "estatutario" ? c.fecha_vencimiento : c.fecha_proximo_servicio;
   const countVencidos = certs.filter(c => { const d = diasHasta(getFechaRef(c)); return d !== null && d < 0; }).length;
@@ -1455,6 +1573,7 @@ export default function App() {
     "gdm-equipo": { titulo: "Golondrina de Mar · Equipos",      sub: "Certificados de equipos y elementos de seguridad, con subvencimientos." },
     "ofast-estat":  { titulo: "Oficina/Astillero · Estatutarios", sub: "Certificados estatutarios de oficina y astillero, con su emisor y fecha de vencimiento." },
     "ofast-equipo": { titulo: "Oficina/Astillero · Equipos",      sub: "Certificados de equipos y elementos de seguridad de oficina y astillero, con subvencimientos." },
+    "catalogos":    { titulo: "Gestor de catálogos", sub: "Administración de listas maestras. Solo el administrador puede modificarlas." },
   };
   const pageConfig = { "ad-estat": { buque: "Atlantic Dama", tipo: "estatutario" }, "ad-equipo": { buque: "Atlantic Dama", tipo: "no_estatutario" }, "gdm-estat": { buque: "Golondrina de Mar", tipo: "estatutario" }, "gdm-equipo": { buque: "Golondrina de Mar", tipo: "no_estatutario" }, "ofast-estat": { buque: "Oficina/Astillero", tipo: "estatutario" }, "ofast-equipo": { buque: "Oficina/Astillero", tipo: "no_estatutario" } };
 
@@ -1474,10 +1593,16 @@ export default function App() {
       { id: "ofast-estat",  icon: "file", label: "Estatutarios", count: 0 },
       { id: "ofast-equipo", icon: "gear", label: "Equipos",      count: 0 },
     ]},
+    ...(isAdmin ? [{ titulo: "Administración", items: [
+      { id: "catalogos", icon: "gear", label: "Catálogos", count: 0 },
+    ]}] : []),
   ];
 
   const seccion = SECCIONES[page] || { titulo: page, sub: "" };
   const inicial = (session.user.email || "C").replace(/@.*$/, "").slice(0, 2).toUpperCase();
+  const isAdmin = (session.user.email || "").trim().toLowerCase() === "emartinez@ploffshore.com";
+  // Nombres del catálogo activos (para selectores)
+  const responsablesActivos = responsables.filter(r => r.activo !== false).map(r => r.nombre);
 
   return (
     <>
@@ -1562,7 +1687,9 @@ export default function App() {
 
           <div className="content">
             {loading ? <div className="loading"><span className="spin">◌</span> Cargando…</div> : <>
-              {page === "alertas" && <PageAlertas certs={certs} subvencimientos={subvencimientos} onSelect={c => setSelected(c)} />}
+              {page === "alertas" && <PageAlertas certs={certs} subvencimientos={subvencimientos} responsables={responsablesActivos} onSelect={c => setSelected(c)} />}
+              {page === "catalogos" && isAdmin && <PageCatalogos responsables={responsables} onChange={loadResponsables} notify={notify} />}
+              {page === "catalogos" && !isAdmin && <div className="empty-state">No tenés permisos para ver esta sección.</div>}
               {pageConfig[page] && (
                 <PageTabla certs={certs} buque={pageConfig[page].buque} tipo={pageConfig[page].tipo} subvencimientos={subvencimientos}
                   onSelect={c => setSelected(c)}
@@ -1601,7 +1728,7 @@ export default function App() {
           notify={notify} onSubvencimientosChange={reloadSubvencimientos} />
       )}
       {(editando || creando) && (
-        <ModalCert cert={editando || creando} onClose={() => { setEditando(null); setCreando(null); }}
+        <ModalCert cert={editando || creando} responsables={responsablesActivos} onClose={() => { setEditando(null); setCreando(null); }}
           onSave={saved => { if (editando) setCerts(prev => prev.map(c => c.id === saved.id ? saved : c)); else setCerts(prev => [...prev, saved]); setEditando(null); setCreando(null); }}
           notify={notify} />
       )}

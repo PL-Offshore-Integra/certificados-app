@@ -1565,6 +1565,10 @@ export default function App() {
     back:  <><path d="M19 12H5" /><path d="M11 6l-6 6 6 6" /></>,
   };
 
+  const isAdmin = (session.user.email || "").trim().toLowerCase() === "emartinez@ploffshore.com";
+  // Nombres del catálogo activos (para selectores)
+  const responsablesActivos = responsables.filter(r => r.activo !== false).map(r => r.nombre);
+
   const SECCIONES = {
     alertas:      { titulo: "Alertas y vencimientos", sub: "Certificados vencidos o por vencer en los próximos 90 días, ordenados por criticidad." },
     "ad-estat":   { titulo: "Atlantic Dama · Estatutarios", sub: "Certificados estatutarios del buque, con su emisor y fecha de vencimiento." },
@@ -1600,9 +1604,6 @@ export default function App() {
 
   const seccion = SECCIONES[page] || { titulo: page, sub: "" };
   const inicial = (session.user.email || "C").replace(/@.*$/, "").slice(0, 2).toUpperCase();
-  const isAdmin = (session.user.email || "").trim().toLowerCase() === "emartinez@ploffshore.com";
-  // Nombres del catálogo activos (para selectores)
-  const responsablesActivos = responsables.filter(r => r.activo !== false).map(r => r.nombre);
 
   return (
     <>

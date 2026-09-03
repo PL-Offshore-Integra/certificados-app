@@ -268,6 +268,8 @@ tr.click:hover td{background:var(--surface2);cursor:pointer}
 .fg textarea:focus{padding:9px 11px}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
 .form-grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+.form-grid-4{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:16px;margin-bottom:16px}
+@media(max-width:768px){.form-grid-4{grid-template-columns:1fr 1fr}}
 .form-section{font-family:var(--mono);font-size:11px;font-weight:500;letter-spacing:.08em;color:var(--muted);text-transform:uppercase;margin:32px 0 16px;padding-bottom:8px;border-bottom:1px solid var(--border)}
 .items-edit th{font-family:var(--mono);font-size:11px;background:var(--surface)}
 .items-edit td{padding:6px 8px}
@@ -492,6 +494,10 @@ tr.click:hover td{background:var(--surface2);cursor:pointer}
 
 /*  VISIBILIDAD TABLA vs TARJETAS · evita el resumen duplicado en desktop  */
 .desktop-table{display:block}
+/* Tabla de certificados compacta: menos padding + columnas de texto truncadas */
+.desktop-table th,.desktop-table td{padding:7px 8px}
+.desktop-table th{font-size:10px;letter-spacing:.03em}
+.desktop-table .col-ell{max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mobile-cards{display:none}
 @media(max-width:768px){
   .desktop-table{display:none}
@@ -1143,9 +1149,9 @@ function PageTabla({ certs, buque, tipo, subvencimientos, onSelect, onNuevo, onS
                     <th style={{ width: 28, textAlign: "center" }}>#</th>
                     <th>Descripción</th>
                     {tipo === "estatutario"
-                      ? <><th>N° Cert.</th><th>Emitido por</th><th>Fecha emisión</th><th>Fecha vencimiento</th></>
-                      : <><th>N° Cert.</th><th>Proveedor</th><th>Último servicio</th><th>Próximo servicio</th></>}
-                    <th>Estado</th><th>Solicitud</th><th>Responsable final</th><th>Doc.</th>
+                      ? <><th>N°</th><th>Emisor</th><th>Emisión</th><th>Vencimiento</th></>
+                      : <><th>N°</th><th>Proveedor</th><th>Últ. serv.</th><th>Próx. serv.</th></>}
+                    <th>Estado</th><th>Solicitud</th><th>Responsable</th><th>Doc.</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1169,7 +1175,7 @@ function PageTabla({ certs, buque, tipo, subvencimientos, onSelect, onNuevo, onS
                             {tipo === "estatutario" && svDeCert.length > 0 && <span className="badge b-teal" style={{ marginLeft: 6, verticalAlign: "middle" }}>{svDeCert.length} verif.</span>}
                           </td>
                           <td className="text-mono" style={{ fontSize: 10, color: "var(--muted)" }}>{c.nro_certificado || "—"}</td>
-                          <td style={{ fontSize: 11, color: "var(--muted)" }}>{tipo === "estatutario" ? (c.emitido_por || "—") : (c.proveedor || "—")}</td>
+                          <td className="col-ell" style={{ fontSize: 11, color: "var(--muted)" }} title={tipo === "estatutario" ? (c.emitido_por || "") : (c.proveedor || "")}>{tipo === "estatutario" ? (c.emitido_por || "—") : (c.proveedor || "—")}</td>
                           <td className="text-mono" style={{ fontSize: 11, color: "var(--muted)" }}>{tipo === "estatutario" ? fmtDate(c.fecha_emision) : fmtDate(c.fecha_ultimo_servicio)}</td>
                           <td className="text-mono" style={{ fontSize: 11, fontWeight: fechaRef ? 600 : 400, color: alertColor === "vencido" ? "var(--danger)" : alertColor === "critico" ? "var(--orange)" : "var(--navy)" }}>
                             {tipo === "estatutario" ? fmtDate(c.fecha_vencimiento) : fmtDate(c.fecha_proximo_servicio)}
@@ -1182,7 +1188,7 @@ function PageTabla({ certs, buque, tipo, subvencimientos, onSelect, onNuevo, onS
                                   : <span className="badge b-amber">Sí · s/n°</span>)
                               : <span style={{ color: "var(--muted2)" }}>No</span>}
                           </td>
-                          <td style={{ fontSize: 11, color: c.responsable_final ? "var(--text)" : "var(--muted2)" }}>{c.responsable_final || "—"}</td>
+                          <td className="col-ell" style={{ fontSize: 11, color: c.responsable_final ? "var(--text)" : "var(--muted2)" }} title={c.responsable_final || ""}>{c.responsable_final || "—"}</td>
                           <td style={{ textAlign: "center" }}>{c.documento_url ? <a href={c.documento_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 14, color: "var(--blue)" }}></a> : <span style={{ color: "var(--muted2)", fontSize: 11 }}>—</span>}</td>
                         </tr>
                         {tipo === "estatutario" && (
@@ -1267,6 +1273,10 @@ function PageAlertas({ certs, subvencimientos, onSelect }) {
   const [desde, setDesde] = useState(hoy);
   const [hasta, setHasta] = useState(def90);
   const [filtroBuque, setFiltroBuque] = useState("");
+  const [filtroResp, setFiltroResp] = useState("");
+
+  // Lista única de responsables cargados (para el selector)
+  const responsables = [...new Set(certs.map(c => (c.responsable_final || "").trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b));
 
   const getFechaRef = c => c.tipo === "estatutario" ? c.fecha_vencimiento : c.fecha_proximo_servicio;
   const vencidos = certs.filter(c => { const d = diasHasta(getFechaRef(c)); return d !== null && d < 0; });
@@ -1274,7 +1284,7 @@ function PageAlertas({ certs, subvencimientos, onSelect }) {
   const proximos = certs.filter(c => { const d = diasHasta(getFechaRef(c)); return d !== null && d > 30 && d <= 90; });
 
   const itemsEnRango = [];
-  certs.filter(c => !filtroBuque || c.buque === filtroBuque).forEach(c => {
+  certs.filter(c => (!filtroBuque || c.buque === filtroBuque) && (!filtroResp || (c.responsable_final || "").trim() === filtroResp)).forEach(c => {
     const f = getFechaRef(c);
     if (f && f >= desde && f <= hasta) itemsEnRango.push({ tipo_item: "cert", fechaRef: f, cert: c, sv: null });
     subvencimientos.filter(s => s.certificado_id === c.id).forEach(s => {
@@ -1286,7 +1296,7 @@ function PageAlertas({ certs, subvencimientos, onSelect }) {
 
   //  Vencidos (siempre visibles, agrupados por buque). Respeta el filtro de buque, ignora el rango de fechas.
   const itemsVencidos = [];
-  certs.filter(c => !filtroBuque || c.buque === filtroBuque).forEach(c => {
+  certs.filter(c => (!filtroBuque || c.buque === filtroBuque) && (!filtroResp || (c.responsable_final || "").trim() === filtroResp)).forEach(c => {
     const f = getFechaRef(c);
     const d = diasHasta(f);
     if (d !== null && d < 0) itemsVencidos.push({ tipo_item: "cert", fechaRef: f, cert: c, sv: null });
@@ -1313,8 +1323,9 @@ function PageAlertas({ certs, subvencimientos, onSelect }) {
       <div className="card mb12">
         <div className="card-title">Filtro por rango de vencimiento</div>
         {/* [H15][DS-11.6] clase form-grid-3 en lugar de gridTemplateColumns inline */}
-        <div className="form-grid-3">
+        <div className="form-grid-4">
           <FG label="Barco"><select value={filtroBuque} onChange={e => setFiltroBuque(e.target.value)}><option value="">Todos</option>{BUQUES.map(b => <option key={b}>{b}</option>)}</select></FG>
+          <FG label="Responsable"><select value={filtroResp} onChange={e => setFiltroResp(e.target.value)}><option value="">Todos</option>{responsables.map(r => <option key={r}>{r}</option>)}</select></FG>
           <FG label="Desde"><input type="date" value={desde} onChange={e => setDesde(e.target.value)} /></FG>
           <FG label="Hasta"><input type="date" value={hasta} onChange={e => setHasta(e.target.value)} /></FG>
         </div>
@@ -1324,7 +1335,7 @@ function PageAlertas({ certs, subvencimientos, onSelect }) {
             {itemsEnRango.filter(i => diasHasta(i.fechaRef) < 0).length > 0 && <span style={{ color: "var(--danger)", marginLeft: 8 }}>· {itemsEnRango.filter(i => diasHasta(i.fechaRef) < 0).length} ya vencidos</span>}
             {itemsEnRango.some(i => i.tipo_item === "subvenc") && <span className="badge b-teal" style={{ marginLeft: 8 }}>{itemsEnRango.filter(i => i.tipo_item === "subvenc").length} verif. incluidas</span>}
           </div>
-          <button className="btn btn-ghost btn-sm" onClick={() => { setDesde(hoy); setHasta(def90); setFiltroBuque(""); }}>Restablecer</button>
+          <button className="btn btn-ghost btn-sm" onClick={() => { setDesde(hoy); setHasta(def90); setFiltroBuque(""); setFiltroResp(""); }}>Restablecer</button>
         </div>
         <div className="info-box success mt8" style={{ fontSize: 10 }}>
           ℹ Incluye vencimientos de <strong>certificados principales</strong> y sus <strong>verificaciones periódicas / subvencimientos</strong>.
@@ -1335,7 +1346,7 @@ function PageAlertas({ certs, subvencimientos, onSelect }) {
       {itemsVencidos.length === 0
         ? <div className="venc-card ok mb12" style={{ borderLeftColor: "var(--accent2)" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, fontWeight: 600, color: "var(--accent2)" }}>
-              <span>✓ Sin certificados vencidos{filtroBuque ? ` en ${filtroBuque}` : ""}</span>
+              <span>✓ Sin certificados vencidos{filtroBuque ? ` en ${filtroBuque}` : ""}{filtroResp ? ` para ${filtroResp}` : ""}</span>
             </div>
           </div>
         : <div className="venc-card mb12">

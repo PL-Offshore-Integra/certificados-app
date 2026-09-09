@@ -4,6 +4,13 @@ import { supabase } from "./lib/supabase";
 const PORTAL_URL = "https://integra.ploffshore.com";
 const ERP_HOME_URL = "https://integra.ploffshore.com";
 const BUQUES = ["Atlantic Dama", "Golondrina de Mar", "Oficina/Astillero"];
+// Buques de acceso restringido: solo los emails listados pueden verlos (además del control real por RLS en Supabase).
+const BUQUES_RESTRINGIDOS = { "WP Halle": ["emartinez@ploffshore.com", "mpadilla@ploffshore.com"] };
+// Devuelve los buques que un usuario puede ver: todos los públicos + los restringidos donde esté autorizado.
+function buquesVisibles(email) {
+  const e = (email || "").trim().toLowerCase();
+  return [...BUQUES, ...Object.keys(BUQUES_RESTRINGIDOS).filter(b => BUQUES_RESTRINGIDOS[b].map(x => x.toLowerCase()).includes(e))];
+}
 const SECCIONES_ESTAT = ["GENERAL", "MARPOL", "INSURANCE", "OTHER"];
 const SECCIONES_NOESTAT = ["FFA", "EQUIPO SALVAMENTO", "EQUIPO DE CARGAMENTO Y CUBIERTA", "PUENTE", "MAQUINAS", "AMARRE", "OTROS"];
 const SECCION_LABEL = {
@@ -786,7 +793,7 @@ function SubvencimientosBloque({ cert, subvencimientos, onAdd, onEdit, onDelete 
 }
 
 //  MODAL EDITAR/CREAR CERT 
-function ModalCert({ cert, responsables = [], onClose, onSave, notify }) {
+function ModalCert({ cert, responsables = [], buques = BUQUES, onClose, onSave, notify }) {
   const esNuevo = !cert.id; const fileRef = useRef();
   const [form, setForm] = useState({
     buque: cert.buque || "Atlantic Dama", tipo: cert.tipo || "estatutario", seccion: cert.seccion || "GENERAL",
@@ -822,7 +829,7 @@ function ModalCert({ cert, responsables = [], onClose, onSave, notify }) {
         <div className="mhdr"><div className="mtitle">{esNuevo ? "Nuevo certificado" : "Editar certificado"}</div><button className="mclose" onClick={onClose}>✕</button></div>
         <div className="mbody">
           <div className="form-grid">
-            <FG label="Buque *"><select value={form.buque} onChange={e => set("buque", e.target.value)}>{BUQUES.map(b => <option key={b}>{b}</option>)}</select></FG>
+            <FG label="Buque *"><select value={form.buque} onChange={e => set("buque", e.target.value)}>{buques.map(b => <option key={b}>{b}</option>)}</select></FG>
             <FG label="Tipo *"><select value={form.tipo} onChange={e => { set("tipo", e.target.value); set("seccion", e.target.value === "estatutario" ? "GENERAL" : "FFA"); }}><option value="estatutario">Estatutario</option><option value="no_estatutario">No estatutario (Equipo)</option></select></FG>
             <FG label="Sección *"><select value={form.seccion} onChange={e => set("seccion", e.target.value)}>{secciones.map(s => <option key={s} value={s}>{SECCION_LABEL[s] || s}</option>)}</select></FG>
             <FG label={esEstat ? "Emitido por" : "Proveedor"}><input value={esEstat ? form.emitido_por : form.proveedor} onChange={e => set(esEstat ? "emitido_por" : "proveedor", e.target.value)} /></FG>
@@ -1358,7 +1365,7 @@ function AlertRow({ item, onSelect, style }) {
 }
 
 //  PAGE ALERTAS 
-function PageAlertas({ certs, subvencimientos, responsables = [], onSelect }) {
+function PageAlertas({ certs, subvencimientos, responsables = [], buques = BUQUES, onSelect }) {
   const hoy = fechaHoy(); const def90 = fechaDefault90();
   const [desde, setDesde] = useState(hoy);
   const [hasta, setHasta] = useState(def90);
@@ -1399,8 +1406,100 @@ function PageAlertas({ certs, subvencimientos, responsables = [], onSelect }) {
   const vencidosPorBuque = {};
   itemsVencidos.forEach(it => { (vencidosPorBuque[it.cert.buque] = vencidosPorBuque[it.cert.buque] || []).push(it); });
   Object.values(vencidosPorBuque).forEach(arr => arr.sort((a, b) => a.fechaRef.localeCompare(b.fechaRef)));
-  const buquesVencidos = BUQUES.filter(b => (vencidosPorBuque[b] || []).length > 0);
+  const buquesVencidos = buques.filter(b => (vencidosPorBuque[b] || []).length > 0);
 
+  //  ALERTA POR MAIL: vencidos + próximos 30 días (respeta filtros de buque y responsable)
+  const itemsAlerta = [];
+  certs.filter(c => (!filtroBuque || c.buque === filtroBuque) && (!filtroResp || (c.responsable_final || "").trim() === filtroResp)).forEach(c => {
+    const f = getFechaRef(c);
+    const d = diasHasta(f);
+    if (d !== null && d <= 30) itemsAlerta.push({ tipo_item: "cert", fechaRef: f, cert: c, sv: null, dias: d });
+    subvencimientos.filter(s => s.certificado_id === c.id).forEach(s => {
+      const dSv = diasHasta(s.fecha_hasta);
+      if (dSv !== null && dSv <= 30) itemsAlerta.push({ tipo_item: "subvenc", fechaRef: s.fecha_hasta, cert: c, sv: s, dias: dSv });
+    });
+  });
+  const alertaPorBuque = {};
+  itemsAlerta.forEach(it => { (alertaPorBuque[it.cert.buque] = alertaPorBuque[it.cert.buque] || []).push(it); });
+  Object.values(alertaPorBuque).forEach(arr => arr.sort((a, b) => a.fechaRef.localeCompare(b.fechaRef)));
+  const buquesAlerta = buques.filter(b => (alertaPorBuque[b] || []).length > 0);
+  const totalVenc = itemsAlerta.filter(i => i.dias < 0).length;
+  const totalPorVenc = itemsAlerta.filter(i => i.dias >= 0).length;
+
+  const chipHtml = d => {
+    const [bg, col, txt] = d < 0 ? ["#FEE2E2", "#991B1B", `Vencido ${Math.abs(d)}d`] : ["#FEF3C7", "#92400E", d === 0 ? "Vence hoy" : `${d}d`];
+    return `<span style="display:inline-block;font-family:'DM Mono',monospace;font-size:9px;font-weight:700;padding:2px 6px;border-radius:3px;background:${bg};color:${col}">${txt}</span>`;
+  };
+  const esc = s => String(s == null ? "" : s).replace(/[&<>]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[m]));
+
+  const generarPDFAlertas = () => {
+    if (itemsAlerta.length === 0) { alert("No hay certificados vencidos ni próximos a vencer (30 días) con los filtros actuales."); return; }
+    const win = window.open("", "_blank", "width=900,height=700");
+    if (!win) { alert("El navegador bloqueó la ventana. Habilitá las ventanas emergentes para este sitio y reintentá."); return; }
+    const fecha = new Date().toLocaleDateString("es-AR");
+    let cuerpo = "";
+    buquesAlerta.forEach(b => {
+      cuerpo += `<h2>${esc(b)} <span style="font-weight:400;color:#6381A7;font-size:12px">(${alertaPorBuque[b].length})</span></h2>`;
+      cuerpo += `<table><thead><tr><th>Tipo</th><th>Descripción</th><th>N° Cert.</th><th>Vencimiento</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>`;
+      alertaPorBuque[b].forEach(it => {
+        const c = it.cert, sv = it.sv, esSv = it.tipo_item === "subvenc";
+        const tipoTxt = esSv ? "Verificación" : (c.tipo === "estatutario" ? "Estatutario" : "Equipo");
+        const desc = esSv ? `↳ ${esc(c.descripcion)} · ${esc(sv.descripcion)}` : esc(c.descripcion);
+        const nro = esSv ? "—" : esc(c.nro_certificado || "—");
+        cuerpo += `<tr><td>${tipoTxt}</td><td style="font-weight:600">${desc}</td><td style="font-family:'DM Mono',monospace;font-size:9px;color:#4A5560">${nro}</td><td style="font-family:'DM Mono',monospace;font-size:9px;font-weight:700">${fmtDate(it.fechaRef)}</td><td>${chipHtml(it.dias)}</td><td style="font-size:9px">${esc(c.responsable_final || "—")}</td></tr>`;
+      });
+      cuerpo += `</tbody></table>`;
+    });
+    const filtroTxt = [filtroBuque && `Establecimiento: ${filtroBuque}`, filtroResp && `Responsable: ${filtroResp}`].filter(Boolean).join(" · ") || "Todos los establecimientos";
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><base href="${window.location.origin}/"><title>Alerta de vencimientos - ${fecha}</title>
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+        *{box-sizing:border-box;margin:0;padding:0}
+        body{font-family:'Montserrat',sans-serif;font-size:12px;color:#213363;padding:28px 32px;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+        @page{size:A4;margin:14mm 12mm}
+        h1{font-size:18px;color:#002247;margin-bottom:2px}
+        .sub{font-size:11px;color:#6381A7;margin-bottom:2px}
+        .resumen{display:flex;gap:16px;margin:14px 0 18px;font-size:11px}
+        .resumen span{padding:4px 10px;border-radius:4px;font-weight:600}
+        h2{font-size:13px;color:#002247;margin:18px 0 6px;border-bottom:1.5px solid #D6E0ED;padding-bottom:4px}
+        table{width:100%;border-collapse:collapse;font-size:10px;margin-bottom:6px}
+        th{font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:#6381A7;padding:5px 8px;text-align:left;border-bottom:1.5px solid #D6E0ED;background:#F5F7FA}
+        td{padding:5px 8px;border-bottom:.5px solid #D6E0ED;vertical-align:top}
+        .foot{margin-top:20px;border-top:1px solid #D6E0ED;padding-top:8px;display:flex;justify-content:space-between;font-size:9px;color:#6381A7;font-family:'DM Mono',monospace}
+      </style></head><body>
+        <h1>Alerta de vencimientos de certificados</h1>
+        <div class="sub">PL Offshore S.A. · ${esc(filtroTxt)}</div>
+        <div class="sub">Generado el ${fecha}</div>
+        <div class="resumen">
+          <span style="background:#FEE2E2;color:#991B1B">Vencidos: ${totalVenc}</span>
+          <span style="background:#FEF3C7;color:#92400E">Por vencer (≤30 días): ${totalPorVenc}</span>
+        </div>
+        ${cuerpo}
+        <div class="foot"><span>PL Offshore S.A. · Sistema de Certificados</span><span>${fecha}</span></div>
+      </body></html>`);
+    win.document.close(); win.focus();
+    const lanzar = () => setTimeout(() => win.print(), 300);
+    if (win.document.readyState === "complete") lanzar(); else win.onload = lanzar;
+  };
+
+  const prepararEmail = () => {
+    if (itemsAlerta.length === 0) { alert("No hay vencimientos para reportar con los filtros actuales."); return; }
+    const fecha = new Date().toLocaleDateString("es-AR");
+    let cuerpo = `Estimados,\n\nSe informa el detalle de certificados vencidos y próximos a vencer (hasta 30 días).\n\nResumen:\n- Vencidos: ${totalVenc}\n- Por vencer (≤30 días): ${totalPorVenc}\n\n`;
+    buquesAlerta.forEach(b => {
+      cuerpo += `${b}:\n`;
+      alertaPorBuque[b].forEach(it => {
+        const c = it.cert, sv = it.sv, esSv = it.tipo_item === "subvenc";
+        const desc = esSv ? `${c.descripcion} · ${sv.descripcion}` : c.descripcion;
+        const estado = it.dias < 0 ? `VENCIDO hace ${Math.abs(it.dias)} días` : it.dias === 0 ? "vence hoy" : `vence en ${it.dias} días`;
+        cuerpo += `  - ${desc} (${fmtDate(it.fechaRef)}, ${estado})${c.responsable_final ? ` · Resp.: ${c.responsable_final}` : ""}\n`;
+      });
+      cuerpo += `\n`;
+    });
+    cuerpo += `IMPORTANTE: adjuntar a este correo el PDF descargado con el detalle.\n\nSaludos.`;
+    const asunto = `Alerta de vencimientos de certificados · PL Offshore · ${fecha}`;
+    window.location.href = `mailto:?subject=${encodeURIComponent(asunto)}&body=${encodeURIComponent(cuerpo)}`;
+  };
 
   return (
     <div>
@@ -1411,11 +1510,21 @@ function PageAlertas({ certs, subvencimientos, responsables = [], onSelect }) {
         <div className="stat"><div className="stat-label">Críticos ≤30d</div><div className="stat-value" style={{ color: "var(--orange)" }}>{criticos.length}</div></div>
         <div className="stat"><div className="stat-label">Próximos ≤90d</div><div className="stat-value" style={{ color: "var(--warn)" }}>{proximos.length}</div></div>
       </div>
+      <div className="card mb12" style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div style={{ fontWeight: 600, fontSize: 13, color: "var(--navy)" }}>Alerta de vencimientos por mail</div>
+          <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>
+            Incluye vencidos + próximos 30 días{filtroBuque || filtroResp ? " (según filtros aplicados)" : ""}. {itemsAlerta.length} ítem{itemsAlerta.length !== 1 ? "s" : ""}: {totalVenc} vencido{totalVenc !== 1 ? "s" : ""}, {totalPorVenc} por vencer.
+          </div>
+        </div>
+        <button className="btn btn-ghost btn-sm" onClick={prepararEmail} disabled={itemsAlerta.length === 0}>Preparar email</button>
+        <button className="btn btn-primary btn-sm" onClick={generarPDFAlertas} disabled={itemsAlerta.length === 0}>Descargar PDF</button>
+      </div>
       <div className="card mb12">
         <div className="card-title">Filtro por rango de vencimiento</div>
         {/* [H15][DS-11.6] clase form-grid-3 en lugar de gridTemplateColumns inline */}
         <div className="form-grid-4">
-          <FG label="Barco"><select value={filtroBuque} onChange={e => setFiltroBuque(e.target.value)}><option value="">Todos</option>{BUQUES.map(b => <option key={b}>{b}</option>)}</select></FG>
+          <FG label="Barco"><select value={filtroBuque} onChange={e => setFiltroBuque(e.target.value)}><option value="">Todos</option>{buques.map(b => <option key={b}>{b}</option>)}</select></FG>
           <FG label="Responsable"><select value={filtroResp} onChange={e => setFiltroResp(e.target.value)}><option value="">Todos</option>{opcionesResp.map(r => <option key={r}>{r}</option>)}</select></FG>
           <FG label="Desde"><input type="date" value={desde} onChange={e => setDesde(e.target.value)} /></FG>
           <FG label="Hasta"><input type="date" value={hasta} onChange={e => setHasta(e.target.value)} /></FG>
@@ -1517,8 +1626,8 @@ export default function App() {
   useEffect(() => { if (session) { loadCerts(); loadResponsables(); } }, [session, loadCerts, loadResponsables]);
 
   const getFechaRef = c => c.tipo === "estatutario" ? c.fecha_vencimiento : c.fecha_proximo_servicio;
-  const countVencidos = certs.filter(c => { const d = diasHasta(getFechaRef(c)); return d !== null && d < 0; }).length;
-  const countCriticos = certs.filter(c => { const d = diasHasta(getFechaRef(c)); return d !== null && d >= 0 && d <= 30; }).length;
+  const countVencidos = certsVisibles.filter(c => { const d = diasHasta(getFechaRef(c)); return d !== null && d < 0; }).length;
+  const countCriticos = certsVisibles.filter(c => { const d = diasHasta(getFechaRef(c)); return d !== null && d >= 0 && d <= 30; }).length;
   const totalAlertas = countVencidos + countCriticos;
 
   // [H16][DS-8.4] loading inicial: var(--navy) + DM Mono 10px rgba(255,255,255,.3)
@@ -1545,6 +1654,9 @@ export default function App() {
   };
 
   const isAdmin = (session.user.email || "").trim().toLowerCase() === "emartinez@ploffshore.com";
+  // Buques que este usuario puede ver + certificados filtrados (defensa en profundidad; el control real es RLS en Supabase)
+  const misBuques = buquesVisibles(session.user.email);
+  const certsVisibles = certs.filter(c => misBuques.includes(c.buque));
   // Nombres del catálogo activos (para selectores)
   const responsablesActivos = responsables.filter(r => r.activo !== false).map(r => r.nombre);
 
@@ -1556,9 +1668,11 @@ export default function App() {
     "gdm-equipo": { titulo: "Golondrina de Mar · Equipos",      sub: "Certificados de equipos y elementos de seguridad, con subvencimientos." },
     "ofast-estat":  { titulo: "Oficina/Astillero · Estatutarios", sub: "Certificados estatutarios de oficina y astillero, con su emisor y fecha de vencimiento." },
     "ofast-equipo": { titulo: "Oficina/Astillero · Equipos",      sub: "Certificados de equipos y elementos de seguridad de oficina y astillero, con subvencimientos." },
+    "wph-estat":  { titulo: "WP Halle · Estatutarios", sub: "Acceso restringido. Certificados estatutarios del buque, con su emisor y fecha de vencimiento." },
+    "wph-equipo": { titulo: "WP Halle · Equipos",      sub: "Acceso restringido. Certificados de equipos y elementos de seguridad, con subvencimientos." },
     "catalogos":    { titulo: "Gestor de catálogos", sub: "Administración de listas maestras. Solo el administrador puede modificarlas." },
   };
-  const pageConfig = { "ad-estat": { buque: "Atlantic Dama", tipo: "estatutario" }, "ad-equipo": { buque: "Atlantic Dama", tipo: "no_estatutario" }, "gdm-estat": { buque: "Golondrina de Mar", tipo: "estatutario" }, "gdm-equipo": { buque: "Golondrina de Mar", tipo: "no_estatutario" }, "ofast-estat": { buque: "Oficina/Astillero", tipo: "estatutario" }, "ofast-equipo": { buque: "Oficina/Astillero", tipo: "no_estatutario" } };
+  const pageConfig = { "ad-estat": { buque: "Atlantic Dama", tipo: "estatutario" }, "ad-equipo": { buque: "Atlantic Dama", tipo: "no_estatutario" }, "gdm-estat": { buque: "Golondrina de Mar", tipo: "estatutario" }, "gdm-equipo": { buque: "Golondrina de Mar", tipo: "no_estatutario" }, "ofast-estat": { buque: "Oficina/Astillero", tipo: "estatutario" }, "ofast-equipo": { buque: "Oficina/Astillero", tipo: "no_estatutario" }, "wph-estat": { buque: "WP Halle", tipo: "estatutario" }, "wph-equipo": { buque: "WP Halle", tipo: "no_estatutario" } };
 
   const NAV = [
     { titulo: "General", items: [
@@ -1576,6 +1690,10 @@ export default function App() {
       { id: "ofast-estat",  icon: "file", label: "Estatutarios", count: 0 },
       { id: "ofast-equipo", icon: "gear", label: "Equipos",      count: 0 },
     ]},
+    ...(misBuques.includes("WP Halle") ? [{ titulo: "WP Halle", items: [
+      { id: "wph-estat",  icon: "file", label: "Estatutarios", count: 0 },
+      { id: "wph-equipo", icon: "gear", label: "Equipos",      count: 0 },
+    ]}] : []),
     ...(isAdmin ? [{ titulo: "Administración", items: [
       { id: "catalogos", icon: "gear", label: "Catálogos", count: 0 },
     ]}] : []),
@@ -1667,11 +1785,12 @@ export default function App() {
 
           <div className="content">
             {loading ? <div className="loading"><span className="spin">◌</span> Cargando…</div> : <>
-              {page === "alertas" && <PageAlertas certs={certs} subvencimientos={subvencimientos} responsables={responsablesActivos} onSelect={c => setSelected(c)} />}
+              {page === "alertas" && <PageAlertas certs={certsVisibles} subvencimientos={subvencimientos} responsables={responsablesActivos} buques={misBuques} onSelect={c => setSelected(c)} />}
               {page === "catalogos" && isAdmin && <PageCatalogos responsables={responsables} onChange={loadResponsables} notify={notify} />}
               {page === "catalogos" && !isAdmin && <div className="empty-state">No tenés permisos para ver esta sección.</div>}
-              {pageConfig[page] && (
-                <PageTabla certs={certs} buque={pageConfig[page].buque} tipo={pageConfig[page].tipo} subvencimientos={subvencimientos}
+              {pageConfig[page] && !misBuques.includes(pageConfig[page].buque) && <div className="empty-state">No tenés permisos para ver este establecimiento.</div>}
+              {pageConfig[page] && misBuques.includes(pageConfig[page].buque) && (
+                <PageTabla certs={certsVisibles} buque={pageConfig[page].buque} tipo={pageConfig[page].tipo} subvencimientos={subvencimientos}
                   onSelect={c => setSelected(c)}
                   onNuevo={() => setCreando({ buque: pageConfig[page].buque, tipo: pageConfig[page].tipo, seccion: pageConfig[page].tipo === "estatutario" ? "GENERAL" : "FFA" })}
                   onSubvencimientosChange={reloadSubvencimientos} onCertsChange={loadCerts} notify={notify} />
@@ -1708,7 +1827,7 @@ export default function App() {
           notify={notify} onSubvencimientosChange={reloadSubvencimientos} />
       )}
       {(editando || creando) && (
-        <ModalCert cert={editando || creando} responsables={responsablesActivos} onClose={() => { setEditando(null); setCreando(null); }}
+        <ModalCert cert={editando || creando} responsables={responsablesActivos} buques={misBuques} onClose={() => { setEditando(null); setCreando(null); }}
           onSave={saved => { if (editando) setCerts(prev => prev.map(c => c.id === saved.id ? saved : c)); else setCerts(prev => [...prev, saved]); setEditando(null); setCreando(null); }}
           notify={notify} />
       )}

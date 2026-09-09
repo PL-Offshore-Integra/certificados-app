@@ -1625,11 +1625,6 @@ export default function App() {
 
   useEffect(() => { if (session) { loadCerts(); loadResponsables(); } }, [session, loadCerts, loadResponsables]);
 
-  const getFechaRef = c => c.tipo === "estatutario" ? c.fecha_vencimiento : c.fecha_proximo_servicio;
-  const countVencidos = certsVisibles.filter(c => { const d = diasHasta(getFechaRef(c)); return d !== null && d < 0; }).length;
-  const countCriticos = certsVisibles.filter(c => { const d = diasHasta(getFechaRef(c)); return d !== null && d >= 0 && d <= 30; }).length;
-  const totalAlertas = countVencidos + countCriticos;
-
   // [H16][DS-8.4] loading inicial: var(--navy) + DM Mono 10px rgba(255,255,255,.3)
   if (checkingAuth) return (
     <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "var(--navy, #213363)" }}>
@@ -1659,6 +1654,11 @@ export default function App() {
   const certsVisibles = certs.filter(c => misBuques.includes(c.buque));
   // Nombres del catálogo activos (para selectores)
   const responsablesActivos = responsables.filter(r => r.activo !== false).map(r => r.nombre);
+  // Contadores del menú (solo sobre los buques visibles para este usuario)
+  const getFechaRef = c => c.tipo === "estatutario" ? c.fecha_vencimiento : c.fecha_proximo_servicio;
+  const countVencidos = certsVisibles.filter(c => { const d = diasHasta(getFechaRef(c)); return d !== null && d < 0; }).length;
+  const countCriticos = certsVisibles.filter(c => { const d = diasHasta(getFechaRef(c)); return d !== null && d >= 0 && d <= 30; }).length;
+  const totalAlertas = countVencidos + countCriticos;
 
   const SECCIONES = {
     alertas:      { titulo: "Alertas y vencimientos", sub: "Certificados vencidos o por vencer en los próximos 90 días, ordenados por criticidad." },

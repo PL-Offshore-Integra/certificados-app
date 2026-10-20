@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { supabase } from "./lib/supabase";
+import { ArchivoLink } from "./lib/archivos";
 
 const PORTAL_URL = "https://integra.ploffshore.com";
 const ERP_HOME_URL = "https://integra.ploffshore.com";
@@ -733,7 +734,7 @@ function ModalSubvencimiento({ certId, sv, onClose, onSave, notify }) {
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: .5, textTransform: "uppercase", color: "var(--navy)", marginBottom: 8 }}>Documento adjunto</div>
             <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: "none" }} onChange={e => handleUpload(e.target.files[0])} />
             {form.documento_url
-              ? <div className="doc-adjunto"><span></span><a href={form.documento_url} target="_blank" rel="noreferrer" style={{ color: "var(--blue)", flex: 1 }}>{form.documento_nombre || "Ver documento"}</a><button onClick={() => { set("documento_url", ""); set("documento_nombre", ""); }} style={{ background: "none", border: "none", color: "var(--muted2)", cursor: "pointer" }}>✕</button></div>
+              ? <div className="doc-adjunto"><span></span><ArchivoLink href={form.documento_url} target="_blank" rel="noreferrer" style={{ color: "var(--blue)", flex: 1 }}>{form.documento_nombre || "Ver documento"}</ArchivoLink><button onClick={() => { set("documento_url", ""); set("documento_nombre", ""); }} style={{ background: "none", border: "none", color: "var(--muted2)", cursor: "pointer" }}>✕</button></div>
               : <button className="btn btn-ghost btn-sm" onClick={() => fileRef.current.click()} disabled={uploading}>{uploading ? " Subiendo..." : " Adjuntar PDF / imagen"}</button>}
           </div>
         </div>
@@ -779,7 +780,7 @@ function SubvencimientosBloque({ cert, subvencimientos, onAdd, onEdit, onDelete 
                 <span className="sv-desc">{s.descripcion}</span>
                 <span className="sv-dates">{s.fecha_desde && s.fecha_hasta ? `${fmtDate(s.fecha_desde)} → ${fmtDate(s.fecha_hasta)}` : s.fecha_hasta ? `Hasta: ${fmtDate(s.fecha_hasta)}` : s.fecha_desde ? `Desde: ${fmtDate(s.fecha_desde)}` : "Sin fechas"}</span>
                 {s.fecha_hasta && <span className={`dias-chip ${alertCls}`}>{labelDiasCompact(diasD)}</span>}
-                {s.documento_url && <a href={s.documento_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 12 }} title={s.documento_nombre}></a>}
+                {s.documento_url && <ArchivoLink href={s.documento_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 12 }} title={s.documento_nombre}></ArchivoLink>}
                 <button onClick={e => { e.stopPropagation(); onEdit(s); }} style={{ background: "none", border: "none", color: "var(--muted)", cursor: "pointer", fontSize: 10, fontWeight: 600, textDecoration: "underline", padding: "2px 4px" }}>Editar</button>
                 <button onClick={e => { e.stopPropagation(); onDelete(s.id); }} style={{ background: "none", border: "none", color: "var(--danger)", cursor: "pointer", fontSize: 10, fontWeight: 600, textDecoration: "underline", padding: "2px 4px" }}>Eliminar</button>
               </div>
@@ -856,7 +857,7 @@ function ModalCert({ cert, responsables = [], buques = BUQUES, onClose, onSave, 
             <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: .5, textTransform: "uppercase", color: "var(--navy)", marginBottom: 8 }}>Documento adjunto</div>
             <input ref={fileRef} type="file" accept=".pdf,.jpg,.jpeg,.png" style={{ display: "none" }} onChange={e => handleUpload(e.target.files[0])} />
             {form.documento_url
-              ? <div className="doc-adjunto"><span></span><a href={form.documento_url} target="_blank" rel="noreferrer" style={{ color: "var(--blue)", flex: 1 }}>{form.documento_nombre || "Ver documento"}</a><button onClick={() => { set("documento_url", ""); set("documento_nombre", ""); }} style={{ background: "none", border: "none", color: "var(--muted2)", cursor: "pointer" }}>✕</button></div>
+              ? <div className="doc-adjunto"><span></span><ArchivoLink href={form.documento_url} target="_blank" rel="noreferrer" style={{ color: "var(--blue)", flex: 1 }}>{form.documento_nombre || "Ver documento"}</ArchivoLink><button onClick={() => { set("documento_url", ""); set("documento_nombre", ""); }} style={{ background: "none", border: "none", color: "var(--muted2)", cursor: "pointer" }}>✕</button></div>
               : <button className="btn btn-ghost btn-sm" onClick={() => fileRef.current.click()} disabled={uploading}>{uploading ? " Subiendo..." : " Adjuntar PDF / imagen"}</button>}
           </div>
         </div>
@@ -924,7 +925,7 @@ function ModalVerCert({ cert, subvencimientos, onClose, onEdit, onDelete, notify
               <div className="info-box"><div style={{ fontSize: 9, color: "var(--muted)", fontFamily: "var(--mono)", marginBottom: 3, textTransform: "uppercase" }}>Responsable final</div>{cert.responsable_final || "—"}</div>
             </div>
             {cert.observaciones && <div className="info-box mt8" style={{ fontSize: 12 }}><strong>Obs:</strong> {cert.observaciones}</div>}
-            {cert.documento_url && <div className="doc-adjunto mt8"><span></span><a href={cert.documento_url} target="_blank" rel="noreferrer" style={{ color: "var(--blue)", flex: 1 }}>{cert.documento_nombre || "Ver documento adjunto"}</a></div>}
+            {cert.documento_url && <div className="doc-adjunto mt8"><span></span><ArchivoLink href={cert.documento_url} target="_blank" rel="noreferrer" style={{ color: "var(--blue)", flex: 1 }}>{cert.documento_nombre || "Ver documento adjunto"}</ArchivoLink></div>}
             {esEstat && <div className="mt12"><SubvencimientosBloque cert={cert} subvencimientos={subvencimientos} onAdd={() => setModalSv("new")} onEdit={sv => setModalSv(sv)} onDelete={handleDeleteSv} /></div>}
             {confirmDelete && (
               <div className="info-box danger mt12" style={{ fontSize: 12 }}>¿Confirmás la eliminación?
@@ -1201,7 +1202,7 @@ function PageTabla({ certs, buque, tipo, subvencimientos, onSelect, onNuevo, onS
                           </td>
                           <td><DiasChip fechaStr={fechaRef} /></td>
                           <td className="col-ell" style={{ fontSize: 11, color: c.responsable_final ? "var(--text)" : "var(--muted2)" }} title={c.responsable_final || ""}>{c.responsable_final || "—"}</td>
-                          <td style={{ textAlign: "center" }}>{c.documento_url ? <a href={c.documento_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 14, color: "var(--blue)" }}></a> : <span style={{ color: "var(--muted2)", fontSize: 11 }}>—</span>}</td>
+                          <td style={{ textAlign: "center" }}>{c.documento_url ? <ArchivoLink href={c.documento_url} target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()} style={{ fontSize: 14, color: "var(--blue)" }}></ArchivoLink> : <span style={{ color: "var(--muted2)", fontSize: 11 }}>—</span>}</td>
                         </tr>
                         {tipo === "estatutario" && (
                           <tr key={`sv-${c.id}`}>
